@@ -2,318 +2,118 @@
 {% block title %}My Expenses — ReimburseFlow{% endblock %}
 
 {% block content %}
-<div class="page-container">
-
-  <div class="page-header">
-    <h1>My Expenses</h1>
-    <p>Submit and track your reimbursement requests.</p>
+<div class="page-header">
+  <div>
+    <h2 class="page-title">My Expenses</h2>
+    <p class="page-subtitle">{{ current_user.name }} &middot; {{ company.name }}</p>
   </div>
+  <button class="btn btn-primary" onclick="openModal('modal-submit')">+ Submit Expense</button>
+</div>
 
-  <!-- Stats -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-card__label">Total Submitted</div>
-      <div class="stat-card__value">{{ expenses|length }}</div>
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="history">🧾 Expense History</button>
+  <button class="tab-btn" data-tab="submit-inline">+ New Expense</button>
+</div>
+
+<!-- ══ HISTORY ═══════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-history">
+  {% if expenses %}
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Title</th><th>Category</th><th>Amount</th>
+          <th>Date</th><th>Rule</th><th>Status</th><th>Approvals</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for expense in expenses %}
+        <tr>
+          <td class="text-muted">#{{ expense.id }}</td>
+          <td>
+            <strong>{{ expense.title }}</strong>
+            {% if expense.vendor %}<br><span class="text-muted text-sm">{{ expense.vendor }}</span>{% endif %}
+          </td>
+          <td>{{ expense.category }}</td>
+          <td>
+            <strong>{{ expense.currency }} {{ '%.2f'|format(expense.amount) }}</strong>
+            {% if expense.currency != company.currency_code %}
+              <br><span class="text-muted text-sm">≈ {{ company.currency_symbol }}{{ '%.2f'|format(expense.amount_in_company_currency or expense.amount) }}</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ expense.expense_date.strftime('%d %b %Y') }}</td>
+          <td class="text-muted">{{ expense.approval_rule.name if expense.approval_rule else '—' }}</td>
+          <td>
+            <span class="badge status-{{ expense.status }}">{{ expense.status|capitalize }}</span>
+          </td>
+          <td>
+            {% if expense.approvals %}
+              <div class="approval-chain-mini">
+                {% for appr in expense.approvals %}
+                  <span class="appr-dot appr-{{ appr.status }}" title="{{ appr.approver.name }}: {{ appr.status }}{% if appr.comment %} — {{ appr.comment }}{% endif %}">
+                    {{ appr.step_order }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="actions-cell">
+            {% if expense.receipt_filename %}
+              <a href="{{ url_for('static', filename='uploads/' + expense.receipt_filename) }}" target="_blank" class="btn btn-sm btn-outline">Receipt</a>
+            {% endif %}
+            {% if expense.status in ('draft', 'pending') %}
+              <form method="POST" action="{{ url_for('employee.cancel_expense', expense_id=expense.id) }}" style="display:inline;" onsubmit="return confirm('Cancel this expense?')">
+                <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🧾</div>
+      <p>No expenses yet. Submit your first expense to get started.</p>
     </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Pending</div>
-      <div class="stat-card__value">{{ expenses|selectattr('status.value', 'equalto', 'pending')|list|length }}</div>
+  {% endif %}
+</div>
+
+<!-- ══ INLINE SUBMIT (tab) ════════════════════════════════════════ -->
+<div class="tab-content" id="tab-submit-inline">
+  {% include "employee/_submit_form.html" %}
+</div>
+
+<!-- ══ SUBMIT MODAL ═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-submit">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>Submit Expense Claim</h3>
+      <button class="modal-close" onclick="closeModal('modal-submit')">×</button>
     </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Approved</div>
-      <div class="stat-card__value">{{ expenses|selectattr('status.value', 'equalto', 'approved')|list|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Rejected</div>
-      <div class="stat-card__value">{{ expenses|selectattr('status.value', 'equalto', 'rejected')|list|length }}</div>
+    <div class="modal-body" style="padding-top:0;">
+      {% include "employee/_submit_form.html" %}
     </div>
   </div>
-
-  <div class="grid-2">
-
-    <!-- ─── Submit Form ──────────────────────────────────────── -->
-    <div class="card">
-      <div class="card-header">
-        <h3>Submit New Expense</h3>
-      </div>
-      <div class="card-body">
-        <form method="POST" action="{{ url_for('employee.submit_expense') }}" enctype="multipart/form-data">
-
-          <div class="form-row">
-            <div class="form-group mb-0">
-              <label>Amount</label>
-              <input type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required />
-            </div>
-            <div class="form-group mb-0">
-              <label>Currency</label>
-              <select name="currency" id="expense-currency">
-                <option value="{{ company.currency_code }}" selected>{{ company.currency_code }} (company default)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Category</label>
-            <select name="category" required>
-              <option value="">Select category</option>
-              <option>Travel</option>
-              <option>Meals &amp; Entertainment</option>
-              <option>Accommodation</option>
-              <option>Office Supplies</option>
-              <option>Software &amp; Tools</option>
-              <option>Training &amp; Conferences</option>
-              <option>Medical</option>
-              <option>Fuel</option>
-              <option>Other</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Date of expense</label>
-            <input type="date" name="date" value="{{ today }}" required />
-          </div>
-
-          <div class="form-group">
-            <label>Description</label>
-            <textarea name="description" placeholder="What was this expense for?"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>Approval workflow</label>
-            <select name="rule_id">
-              <option value="">No specific rule</option>
-              {% for rule in rules %}
-              <option value="{{ rule.id }}">{{ rule.name }}</option>
-              {% endfor %}
-            </select>
-            <span class="form-hint">Ask your admin which rule applies to you.</span>
-          </div>
-
-          <div class="form-group">
-            <label>Receipt <small>(optional — PNG, JPG, PDF)</small></label>
-            <input type="file" name="receipt" id="receipt-input"
-              accept=".png,.jpg,.jpeg,.gif,.webp,.pdf"
-              onchange="handleReceiptChange(this)" />
-            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-              <button type="button" class="btn btn--secondary btn--sm" id="ocr-btn"
-                onclick="runOCR()" disabled>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <path d="M3 9h18M9 21V9"/>
-                </svg>
-                Scan with AI OCR
-              </button>
-              <span class="text-xs text-muted" id="ocr-status"></span>
-            </div>
-            <img id="receipt-preview" class="receipt-preview" src="" alt="Receipt preview" />
-          </div>
-
-          <button type="submit" class="btn btn--primary w-full">Submit expense</button>
-        </form>
-      </div>
-    </div>
-
-    <!-- ─── Expense History ──────────────────────────────────── -->
-    <div class="card">
-      <div class="card-header">
-        <h3>Expense History</h3>
-      </div>
-      <div class="table-wrap">
-        {% if expenses %}
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for exp in expenses %}
-            <tr>
-              <td class="td-muted">{{ exp.date.strftime('%d %b %Y') }}</td>
-              <td>
-                <a href="{{ url_for('employee.expense_detail', expense_id=exp.id) }}"
-                  style="font-weight:500;color:var(--text-primary);">
-                  {{ exp.category }}
-                </a>
-              </td>
-              <td>
-                {{ exp.amount }} {{ exp.currency }}
-                {% if exp.amount_in_company_currency and exp.currency != company.currency_code %}
-                  <br><small class="text-muted">≈ {{ '%.2f'|format(exp.amount_in_company_currency) }} {{ company.currency_code }}</small>
-                {% endif %}
-              </td>
-              <td><span class="chip chip--{{ exp.status.value }}">{{ exp.status.value }}</span></td>
-              <td>
-                <div class="btn-group">
-                  <a href="{{ url_for('employee.expense_detail', expense_id=exp.id) }}"
-                    class="btn btn--ghost btn--sm">View</a>
-                  {% if exp.status.value in ('draft', 'pending') %}
-                  <form method="POST" action="{{ url_for('employee.cancel_expense', expense_id=exp.id) }}"
-                    onsubmit="return confirm('Cancel this expense?')">
-                    <button class="btn btn--ghost btn--sm" style="color:var(--danger)">Cancel</button>
-                  </form>
-                  {% endif %}
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-          <p>You haven't submitted any expenses yet.</p>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-
-  </div><!-- /grid-2 -->
-
-</div><!-- /page-container -->
+</div>
 
 <script>
-(function () {
-  // ─── Populate currency dropdown ──────────────────────────────────
-  const COUNTRIES_API = 'https://restcountries.com/v3.1/all?fields=name,currencies';
-  const currencySelect = document.getElementById('expense-currency');
-  const defaultCurrency = '{{ company.currency_code }}';
-
-  fetch(COUNTRIES_API)
-    .then(r => r.json())
-    .then(data => {
-      const codes = new Set();
-      data.forEach(c => {
-        Object.keys(c.currencies || {}).forEach(code => codes.add(code));
-      });
-      const sorted = Array.from(codes).sort();
-      currencySelect.innerHTML = '';
-      sorted.forEach(code => {
-        const opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = code;
-        if (code === defaultCurrency) opt.selected = true;
-        currencySelect.appendChild(opt);
-      });
-    })
-    .catch(() => {
-      currencySelect.innerHTML = `<option value="${defaultCurrency}">${defaultCurrency}</option>`;
-    });
-})();
-
-
-// ─── OCR ──────────────────────────────────────────────────────────
-
-let currentReceiptFile = null;
-
-function handleReceiptChange(input) {
-  const preview = document.getElementById('receipt-preview');
-  const ocrBtn  = document.getElementById('ocr-btn');
-  const file = input.files[0];
-  currentReceiptFile = file || null;
-
-  // Enable / disable OCR button (only for images, not PDFs)
-  if (file && file.type.startsWith('image/')) {
-    ocrBtn.disabled = false;
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = e => {
-      preview.src = e.target.result;
-      preview.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  } else {
-    ocrBtn.disabled = true;
-    preview.style.display = 'none';
-    // PDF: still allow upload but no preview / OCR
-  }
-  document.getElementById('ocr-status').textContent = '';
-}
-
-async function runOCR() {
-  if (!currentReceiptFile) return;
-
-  const btn    = document.getElementById('ocr-btn');
-  const status = document.getElementById('ocr-status');
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Scanning...';
-  status.textContent = '';
-
-  const formData = new FormData();
-  formData.append('receipt', currentReceiptFile);
-
-  try {
-    const resp = await fetch('/employee/ocr/scan', {
-      method: 'POST',
-      body: formData,
-    });
-    const json = await resp.json();
-
-    if (!json.success) {
-      status.textContent = json.error || 'OCR failed. Fill in manually.';
-      status.style.color = 'var(--danger)';
-      return;
-    }
-
-    const d = json.data;
-    status.textContent = '';
-    let filled = 0;
-
-    // amount
-    if (d.amount != null) {
-      document.querySelector('[name="amount"]').value = d.amount;
-      filled++;
-    }
-    // currency
-    if (d.currency) {
-      const sel = document.getElementById('expense-currency');
-      const opt = Array.from(sel.options).find(o => o.value === d.currency);
-      if (opt) { sel.value = d.currency; filled++; }
-    }
-    // date
-    if (d.date) {
-      document.querySelector('[name="date"]').value = d.date;
-      filled++;
-    }
-    // description — combine vendor + description if both present
-    if (d.description || d.vendor) {
-      const desc = [d.vendor, d.description].filter(Boolean).join(' — ');
-      document.querySelector('[name="description"]').value = desc;
-      filled++;
-    }
-    // category
-    if (d.category) {
-      const catSel = document.querySelector('[name="category"]');
-      const catOpt = Array.from(catSel.options).find(
-        o => o.value.toLowerCase() === d.category.toLowerCase()
-      );
-      if (catOpt) { catSel.value = catOpt.value; filled++; }
-    }
-
-    status.textContent = filled > 0
-      ? `✓ ${filled} field${filled > 1 ? 's' : ''} auto-filled from receipt`
-      : 'Could not read receipt fields. Please fill manually.';
-    status.style.color = filled > 0 ? 'var(--success)' : 'var(--warning)';
-
-  } catch (err) {
-    status.textContent = 'Network error during scan.';
-    status.style.color = 'var(--danger)';
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <path d="M3 9h18M9 21V9"/>
-      </svg>
-      Scan with AI OCR`;
-  }
-}
+function openModal(id) { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".modal-overlay").forEach(o => {
+  o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); });
+});
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
 </script>
 {% endblock %}

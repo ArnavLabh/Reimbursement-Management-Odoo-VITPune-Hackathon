@@ -1,482 +1,427 @@
 {% extends "base.html" %}
-{% block title %}Admin — {{ company.name }}{% endblock %}
+{% block title %}Admin Dashboard — ReimburseFlow{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Admin Dashboard</h2>
+    <p class="page-subtitle">{{ company.name }} &middot; {{ company.currency_code }} ({{ company.currency_symbol }})</p>
+  </div>
+  <div class="header-stats">
+    <div class="stat-pill">{{ users|length }} Users</div>
+    <div class="stat-pill">{{ rules|length }} Rules</div>
+    <div class="stat-pill">{{ expenses|length }} Expenses</div>
+  </div>
+</div>
 
-  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
-    <div>
-      <h1>{{ company.name }}</h1>
-      <p>Admin dashboard &middot; Currency: <strong>{{ company.currency_code }}</strong> &middot; {{ company.country }}</p>
-    </div>
-    <a href="{{ url_for('admin.settings') }}" class="btn btn--secondary btn--sm">
-      Company Settings
-    </a>
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="users">👥 Users</button>
+  <button class="tab-btn" data-tab="rules">⚙️ Approval Rules</button>
+  <button class="tab-btn" data-tab="expenses">🧾 All Expenses</button>
+</div>
+
+<!-- ══ USERS TAB ══════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-users">
+  <div class="section-header">
+    <h3>User Management</h3>
+    <button class="btn btn-primary" onclick="openModal('modal-create-user')">+ Add User</button>
   </div>
 
-  <!-- Stats -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-card__label">Employees</div>
-      <div class="stat-card__value">{{ employees|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Managers</div>
-      <div class="stat-card__value">{{ managers|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Approval Rules</div>
-      <div class="stat-card__value">{{ approval_rules|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Recent Expenses</div>
-      <div class="stat-card__value">{{ all_expenses|length }}</div>
-    </div>
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Email</th><th>Role</th><th>Manager</th><th>Created</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td><strong>{{ user.name }}</strong>{% if user.id == current_user.id %} <span class="badge badge-you">You</span>{% endif %}</td>
+          <td class="text-muted">{{ user.email }}</td>
+          <td><span class="badge role-{{ user.role }}">{{ user.role|capitalize }}</span></td>
+          <td>{{ user.manager.name if user.manager else '—' }}</td>
+          <td class="text-muted">{{ user.created_at.strftime('%d %b %Y') }}</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-outline" onclick="openEditUser({{ user.id }}, '{{ user.name }}', '{{ user.role }}', {{ user.manager_id or 'null' }})">Edit</button>
+            {% if user.id != current_user.id %}
+            <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline;" onsubmit="return confirm('Delete {{ user.name }}?')">
+              <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ RULES TAB ══════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-rules">
+  <div class="section-header">
+    <h3>Approval Rules</h3>
+    <button class="btn btn-primary" onclick="openModal('modal-create-rule')">+ New Rule</button>
   </div>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="users">Users</button>
-    <button class="tab-btn" data-tab="rules">Approval Rules</button>
-    <button class="tab-btn" data-tab="expenses">All Expenses</button>
-  </div>
-
-  <!-- ─── USERS TAB ─────────────────────────────────────────────── -->
-  <div class="tab-pane active" id="tab-users">
-    <div class="card mb-24">
-      <div class="card-header">
-        <h3>Team Members</h3>
-        <button class="btn btn--primary btn--sm" onclick="openModal('modal-create-user')">
-          + Add User
-        </button>
+  {% if rules %}
+  <div class="rules-grid">
+    {% for rule in rules %}
+    <div class="rule-card">
+      <div class="rule-card-header">
+        <h4>{{ rule.name }}</h4>
+        <form method="POST" action="{{ url_for('admin.delete_rule', rule_id=rule.id) }}" onsubmit="return confirm('Delete rule?')">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
       </div>
-      <div class="table-wrap">
-        {% if all_users %}
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Manager</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for u in all_users %}
-            <tr>
-              <td><strong>{{ u.name }}</strong></td>
-              <td class="td-muted">{{ u.email }}</td>
-              <td><span class="badge badge--{{ u.role.value }}">{{ u.role.value }}</span></td>
-              <td class="td-muted">{{ u.manager.name if u.manager else '—' }}</td>
-              <td>
-                <div class="btn-group">
-                  <button class="btn btn--ghost btn--sm"
-                    onclick="openEditModal({{ u.id }}, '{{ u.role.value }}', {{ u.manager_id or 'null' }})">
-                    Edit
-                  </button>
-                  <form method="POST" action="{{ url_for('admin.delete_user', user_id=u.id) }}"
-                    onsubmit="return confirm('Delete {{ u.name }}? This cannot be undone.')">
-                    <button class="btn btn--ghost btn--sm" style="color:var(--danger)">Delete</button>
-                  </form>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="rule-meta">
+        {% if rule.manager_is_first_approver %}
+          <span class="badge badge-info">Manager as Step 1</span>
+        {% endif %}
+        {% if rule.approval_percentage %}
+          <span class="badge badge-info">{{ rule.approval_percentage|int }}% threshold</span>
+        {% endif %}
+        {% if rule.specific_approver %}
+          <span class="badge badge-info">{{ rule.specific_approver.name }} auto-approves</span>
+        {% endif %}
+      </div>
+      <div class="rule-steps">
+        {% if rule.steps %}
+          {% for step in rule.steps %}
+            <div class="step-item">
+              <span class="step-num">{{ step.step_order }}</span>
+              <span class="step-approver">{{ step.approver.name }}</span>
+              <span class="step-role badge role-{{ step.approver.role }}">{{ step.approver.role }}</span>
+            </div>
+          {% endfor %}
         {% else %}
-        <div class="empty-state">
-          <p>No users yet. Add employees and managers to get started.</p>
-        </div>
+          <p class="text-muted">No approver steps defined.</p>
         {% endif %}
       </div>
     </div>
+    {% endfor %}
   </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">⚙️</div>
+      <p>No approval rules yet. Create one to define workflows.</p>
+    </div>
+  {% endif %}
+</div>
 
-  <!-- ─── RULES TAB ─────────────────────────────────────────────── -->
-  <div class="tab-pane" id="tab-rules">
-    <div class="card mb-24">
-      <div class="card-header">
-        <h3>Approval Rules</h3>
-        <button class="btn btn--primary btn--sm" onclick="openModal('modal-create-rule')">
-          + New Rule
-        </button>
-      </div>
-      <div class="table-wrap">
-        {% if approval_rules %}
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Manager First</th>
-              <th>% Threshold</th>
-              <th>Specific Approver</th>
-              <th>Steps</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for rule in approval_rules %}
-            <tr>
-              <td><strong>{{ rule.name }}</strong><br><small>{{ rule.description or '' }}</small></td>
-              <td>
-                {% if rule.is_manager_approver %}
-                  <span class="chip chip--approved">Yes</span>
-                {% else %}
-                  <span class="chip chip--draft">No</span>
-                {% endif %}
-              </td>
-              <td class="td-muted">{{ '%.0f%%'|format(rule.approval_percentage) if rule.approval_percentage else '—' }}</td>
-              <td class="td-muted">{{ rule.specific_approver.name if rule.specific_approver else '—' }}</td>
-              <td class="td-muted">
-                {% if rule.steps %}
-                  {{ rule.steps|map(attribute='approver')|map(attribute='name')|join(' → ') }}
-                {% else %}
-                  No steps
-                {% endif %}
-              </td>
-              <td>
-                <form method="POST" action="{{ url_for('admin.delete_rule', rule_id=rule.id) }}"
-                  onsubmit="return confirm('Delete rule {{ rule.name }}?')">
-                  <button class="btn btn--ghost btn--sm" style="color:var(--danger)">Delete</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-          <p>No approval rules configured. Create one to manage expense workflows.</p>
-        </div>
-        {% endif %}
-      </div>
+<!-- ══ EXPENSES TAB ════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-expenses">
+  <div class="section-header">
+    <h3>All Expenses</h3>
+    <div class="filter-group">
+      <select id="status-filter" onchange="filterExpenses()">
+        <option value="">All Statuses</option>
+        <option>pending</option><option>approved</option>
+        <option>rejected</option><option>cancelled</option><option>draft</option>
+      </select>
     </div>
   </div>
 
-  <!-- ─── EXPENSES TAB ──────────────────────────────────────────── -->
-  <div class="tab-pane" id="tab-expenses">
-    <div class="card">
-      <div class="card-header">
-        <h3>All Expenses</h3>
-        <span class="text-sm text-muted">Last 20</span>
-      </div>
-      <div class="table-wrap">
-        {% if all_expenses %}
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Employee</th>
-              <th>Amount</th>
-              <th>In {{ company.currency_code }}</th>
-              <th>Category</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Override</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for exp in all_expenses %}
-            <tr>
-              <td class="td-muted">#{{ exp.id }}</td>
-              <td><strong>{{ exp.employee.name }}</strong></td>
-              <td>{{ exp.amount }} {{ exp.currency }}</td>
-              <td class="td-muted">
-                {{ '%.2f'|format(exp.amount_in_company_currency) if exp.amount_in_company_currency else '—' }}
-                {{ company.currency_code }}
-              </td>
-              <td class="td-muted">{{ exp.category }}</td>
-              <td class="td-muted">{{ exp.date.strftime('%d %b %Y') }}</td>
-              <td><span class="chip chip--{{ exp.status.value }}">{{ exp.status.value }}</span></td>
-              <td>
-                {% if exp.status.value in ('pending', 'draft') %}
-                <button class="btn btn--sm btn--ghost"
-                  onclick="openOverrideModal({{ exp.id }})">
-                  Override
-                </button>
-                {% else %}
-                  <span class="td-muted">—</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-          <p>No expenses submitted yet.</p>
-        </div>
-        {% endif %}
-      </div>
-    </div>
+  <div class="table-wrapper">
+    <table class="data-table" id="expenses-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Employee</th><th>Title</th><th>Category</th>
+          <th>Amount</th><th>Company Amount</th><th>Status</th><th>Date</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for expense in expenses %}
+        <tr data-status="{{ expense.status }}">
+          <td class="text-muted">#{{ expense.id }}</td>
+          <td><strong>{{ expense.employee.name }}</strong></td>
+          <td>{{ expense.title }}</td>
+          <td>{{ expense.category }}</td>
+          <td>{{ expense.currency }} {{ '%.2f'|format(expense.amount) }}</td>
+          <td>
+            {% if expense.currency != company.currency_code %}
+              {{ company.currency_symbol }}{{ '%.2f'|format(expense.amount_in_company_currency or expense.amount) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td><span class="badge status-{{ expense.status }}">{{ expense.status|capitalize }}</span></td>
+          <td class="text-muted">{{ expense.expense_date.strftime('%d %b %Y') }}</td>
+          <td class="actions-cell">
+            {% if expense.status == 'pending' %}
+            <button class="btn btn-sm btn-success" onclick="openOverride({{ expense.id }}, 'approve')">Approve</button>
+            <button class="btn btn-sm btn-danger" onclick="openOverride({{ expense.id }}, 'reject')">Reject</button>
+            {% endif %}
+            <button class="btn btn-sm btn-outline" onclick="openExpenseDetail({{ expense.id }})">Detail</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+</div>
 
-</div><!-- /page-container -->
+<!-- ══ MODALS ═══════════════════════════════════════════════════════ -->
 
-
-<!-- ─── MODAL: Create User ─────────────────────────────────────── -->
+<!-- Create User Modal -->
 <div class="modal-overlay" id="modal-create-user">
   <div class="modal">
     <div class="modal-header">
       <h3>Add User</h3>
-      <button class="modal-close" onclick="closeModal('modal-create-user')">&times;</button>
+      <button class="modal-close" onclick="closeModal('modal-create-user')">×</button>
     </div>
     <form method="POST" action="{{ url_for('admin.create_user') }}">
       <div class="modal-body">
-        <div class="form-group">
-          <label>Full name</label>
-          <input type="text" name="name" placeholder="Jane Smith" required />
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" name="email" placeholder="jane@company.com" required />
-        </div>
-        <div class="form-group">
-          <label>Temporary password</label>
-          <input type="password" name="password" placeholder="Min. 6 characters" required />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" name="name" required />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" required />
+          </div>
         </div>
         <div class="form-row">
-          <div class="form-group mb-0">
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required minlength="6" />
+          </div>
+          <div class="form-group">
             <label>Role</label>
-            <select name="role" id="new-user-role" onchange="toggleManagerField()">
+            <select name="role" required>
               <option value="employee">Employee</option>
               <option value="manager">Manager</option>
-            </select>
-          </div>
-          <div class="form-group mb-0" id="manager-field">
-            <label>Reports to (Manager)</label>
-            <select name="manager_id">
-              <option value="">None</option>
-              {% for m in managers %}
-              <option value="{{ m.id }}">{{ m.name }}</option>
-              {% endfor %}
+              <option value="admin">Admin</option>
             </select>
           </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn--secondary" onclick="closeModal('modal-create-user')">Cancel</button>
-        <button type="submit" class="btn btn--primary">Create user</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- ─── MODAL: Edit User ───────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-edit-user">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>Edit User</h3>
-      <button class="modal-close" onclick="closeModal('modal-edit-user')">&times;</button>
-    </div>
-    <form method="POST" id="edit-user-form" action="">
-      <div class="modal-body">
         <div class="form-group">
-          <label>Role</label>
-          <select name="role" id="edit-role">
-            <option value="employee">Employee</option>
-            <option value="manager">Manager</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Reports to (Manager)</label>
-          <select name="manager_id" id="edit-manager">
-            <option value="">None</option>
+          <label>Manager (optional)</label>
+          <select name="manager_id">
+            <option value="">— None —</option>
             {% for m in managers %}
-            <option value="{{ m.id }}">{{ m.name }}</option>
+              <option value="{{ m.id }}">{{ m.name }} ({{ m.role }})</option>
             {% endfor %}
           </select>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn--secondary" onclick="closeModal('modal-edit-user')">Cancel</button>
-        <button type="submit" class="btn btn--primary">Save changes</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-create-user')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create User</button>
       </div>
     </form>
   </div>
 </div>
 
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="modal-edit-user">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit User</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-user')">×</button>
+    </div>
+    <form method="POST" id="edit-user-form" action="">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" name="name" id="edit-user-name" required />
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <select name="role" id="edit-user-role">
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Manager (optional)</label>
+          <select name="manager_id" id="edit-user-manager">
+            <option value="">— None —</option>
+            {% for m in managers %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>New Password (leave blank to keep)</label>
+          <input type="password" name="password" placeholder="••••••••" minlength="6" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit-user')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-<!-- ─── MODAL: Create Rule ────────────────────────────────────── -->
+<!-- Create Rule Modal -->
 <div class="modal-overlay" id="modal-create-rule">
-  <div class="modal" style="max-width:600px;">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3>New Approval Rule</h3>
-      <button class="modal-close" onclick="closeModal('modal-create-rule')">&times;</button>
+      <button class="modal-close" onclick="closeModal('modal-create-rule')">×</button>
     </div>
     <form method="POST" action="{{ url_for('admin.create_rule') }}">
       <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group mb-0">
-            <label>Rule name</label>
-            <input type="text" name="rule_name" placeholder="e.g. Standard Approval" required />
-          </div>
-          <div class="form-group mb-0">
-            <label>Description <small>(optional)</small></label>
-            <input type="text" name="rule_description" placeholder="Brief description" />
-          </div>
+        <div class="form-group">
+          <label>Rule Name</label>
+          <input type="text" name="rule_name" placeholder="e.g. Standard Expense Approval" required />
         </div>
 
-        <div class="auth-section-label mt-16">Conditional Logic</div>
-
-        <div class="toggle-row">
-          <input type="checkbox" id="is_manager_approver" name="is_manager_approver" value="1" />
-          <label for="is_manager_approver">
-            Manager approves first — employee's direct manager is always Step 1
-          </label>
+        <div class="form-check" style="margin-bottom:1rem;">
+          <input type="checkbox" id="manager_is_first" name="manager_is_first_approver" />
+          <label for="manager_is_first"><strong>IS MANAGER APPROVER</strong> — Employee's direct manager is always Step 1</label>
         </div>
 
-        <div class="form-row">
-          <div class="form-group mb-0">
-            <label>Approval threshold (%)</label>
-            <input type="number" name="approval_percentage" min="1" max="100"
-              placeholder="e.g. 60 — leave blank to skip" />
-            <span class="form-hint">If X% of approvers approve, expense is auto-approved.</span>
-          </div>
-          <div class="form-group mb-0">
-            <label>Specific auto-approver</label>
-            <select name="specific_approver_id">
-              <option value="">None</option>
-              {% for u in all_users %}
-              <option value="{{ u.id }}">{{ u.name }} ({{ u.role.value }})</option>
+        <div class="form-section-label">Approver Sequence</div>
+        <div id="approver-steps">
+          <div class="approver-step-row">
+            <span class="step-num">1</span>
+            <select name="approver_ids[]" class="approver-select">
+              <option value="">— Select approver —</option>
+              {% for u in all_approvers %}
+                <option value="{{ u.id }}">{{ u.name }} ({{ u.role }})</option>
               {% endfor %}
             </select>
-            <span class="form-hint">If this person approves, expense is instantly approved.</span>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeStep(this)">✕</button>
           </div>
         </div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addApproverStep()" style="margin-top:.5rem;">+ Add Step</button>
 
-        <div class="auth-section-label mt-16">Approver Sequence</div>
-        <p class="text-sm text-muted mb-16">Add approvers in order. Manager step is inserted before these if enabled above.</p>
-
-        <div class="steps-list" id="steps-list"></div>
-        <button type="button" class="btn btn--secondary btn--sm" onclick="addStep()">+ Add step</button>
+        <div class="form-section-label" style="margin-top:1.5rem;">Conditional Auto-Approval</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Minimum Approval % (0 = disabled)</label>
+            <input type="number" name="approval_percentage" value="0" min="0" max="100" step="1" />
+          </div>
+          <div class="form-group">
+            <label>Specific Auto-Approver (optional)</label>
+            <select name="specific_approver_id">
+              <option value="">— None —</option>
+              {% for u in all_approvers %}
+                <option value="{{ u.id }}">{{ u.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn--secondary" onclick="closeModal('modal-create-rule')">Cancel</button>
-        <button type="submit" class="btn btn--primary">Create rule</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-create-rule')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Rule</button>
       </div>
     </form>
   </div>
 </div>
 
-
-<!-- ─── MODAL: Admin Override ─────────────────────────────────── -->
+<!-- Override Modal -->
 <div class="modal-overlay" id="modal-override">
   <div class="modal">
     <div class="modal-header">
-      <h3>Admin Override</h3>
-      <button class="modal-close" onclick="closeModal('modal-override')">&times;</button>
+      <h3 id="override-title">Admin Override</h3>
+      <button class="modal-close" onclick="closeModal('modal-override')">×</button>
     </div>
     <form method="POST" id="override-form" action="">
       <div class="modal-body">
-        <p class="text-sm mb-16">Override the current approval status for this expense.</p>
         <input type="hidden" name="action" id="override-action" />
         <div class="form-group">
-          <label>Comment <small>(optional)</small></label>
-          <textarea name="comment" placeholder="Reason for override..."></textarea>
+          <label>Reason / Comment</label>
+          <textarea name="comment" rows="3" placeholder="Admin override reason…"></textarea>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn--secondary" onclick="closeModal('modal-override')">Cancel</button>
-        <button type="button" class="btn btn--danger" onclick="setOverride('reject')">Reject</button>
-        <button type="button" class="btn btn--success" onclick="setOverride('approve')">Approve</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-override')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Confirm</button>
       </div>
     </form>
   </div>
 </div>
 
-
 <script>
-// ─── Modal helpers ───────────────────────────────────────────────
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
-// Close on backdrop click
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
-});
-
-// ─── Tabs ────────────────────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+// Tab switching
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
   });
 });
 
-// ─── Create User: toggle manager field ──────────────────────────
-function toggleManagerField() {
-  const role = document.getElementById('new-user-role').value;
-  document.getElementById('manager-field').style.opacity = role === 'manager' ? '0.4' : '1';
+// Modal helpers
+function openModal(id) { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".modal-overlay").forEach(overlay => {
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.classList.remove("open"); });
+});
+
+// Edit user
+function openEditUser(id, name, role, managerId) {
+  document.getElementById("edit-user-form").action = `/admin/users/${id}/edit`;
+  document.getElementById("edit-user-name").value = name;
+  document.getElementById("edit-user-role").value = role;
+  const mgrSelect = document.getElementById("edit-user-manager");
+  mgrSelect.value = managerId || "";
+  openModal("modal-edit-user");
 }
 
-// ─── Edit User modal ─────────────────────────────────────────────
-function openEditModal(userId, role, managerId) {
-  document.getElementById('edit-user-form').action = '/admin/users/' + userId + '/update';
-  const roleSelect = document.getElementById('edit-role');
-  roleSelect.value = role;
-  const mgrSelect = document.getElementById('edit-manager');
-  mgrSelect.value = managerId ? String(managerId) : '';
-  openModal('modal-edit-user');
+// Override
+function openOverride(expenseId, action) {
+  document.getElementById("override-form").action = `/admin/expenses/${expenseId}/override`;
+  document.getElementById("override-action").value = action;
+  document.getElementById("override-title").textContent = `Admin ${action.charAt(0).toUpperCase() + action.slice(1)} — Expense #${expenseId}`;
+  openModal("modal-override");
 }
 
-// ─── Approval Steps Builder ───────────────────────────────────────
-const allUsers = [
-  {% for u in all_users %}
-  { id: {{ u.id }}, name: "{{ u.name }}", role: "{{ u.role.value }}" },
-  {% endfor %}
-];
-
-let stepCount = 0;
-
-function addStep() {
+// Add/remove approver steps
+let stepCount = 1;
+function addApproverStep() {
   stepCount++;
-  const list = document.getElementById('steps-list');
-  const row = document.createElement('div');
-  row.className = 'step-row';
+  const container = document.getElementById("approver-steps");
+  const row = document.createElement("div");
+  row.className = "approver-step-row";
   row.innerHTML = `
-    <span class="step-row__num">Step ${stepCount}</span>
-    <select name="approver_ids[]" style="flex:1;">
-      <option value="">Select approver</option>
-      ${allUsers.map(u => `<option value="${u.id}">${u.name} (${u.role})</option>`).join('')}
+    <span class="step-num">${stepCount}</span>
+    <select name="approver_ids[]" class="approver-select">
+      <option value="">— Select approver —</option>
+      {% for u in all_approvers %}
+        <option value="{{ u.id }}">{{ u.name }} ({{ u.role }})</option>
+      {% endfor %}
     </select>
-    <button type="button" class="btn btn--ghost btn--sm" onclick="removeStep(this)">
-      &times;
-    </button>
+    <button type="button" class="btn btn-sm btn-danger" onclick="removeStep(this)">✕</button>
   `;
-  list.appendChild(row);
+  container.appendChild(row);
   renumberSteps();
 }
-
 function removeStep(btn) {
-  btn.closest('.step-row').remove();
+  const rows = document.querySelectorAll(".approver-step-row");
+  if (rows.length <= 1) return;
+  btn.closest(".approver-step-row").remove();
   renumberSteps();
 }
-
 function renumberSteps() {
-  document.querySelectorAll('#steps-list .step-row__num').forEach((el, i) => {
-    el.textContent = 'Step ' + (i + 1);
+  document.querySelectorAll(".approver-step-row").forEach((row, i) => {
+    row.querySelector(".step-num").textContent = i + 1;
   });
-  stepCount = document.querySelectorAll('#steps-list .step-row').length;
+  stepCount = document.querySelectorAll(".approver-step-row").length;
 }
 
-// ─── Override modal ───────────────────────────────────────────────
-function openOverrideModal(expenseId) {
-  document.getElementById('override-form').action = '/admin/expenses/' + expenseId + '/override';
-  openModal('modal-override');
+// Expense filter
+function filterExpenses() {
+  const val = document.getElementById("status-filter").value.toLowerCase();
+  document.querySelectorAll("#expenses-table tbody tr").forEach(row => {
+    row.style.display = (!val || row.dataset.status === val) ? "" : "none";
+  });
 }
 
-function setOverride(action) {
-  document.getElementById('override-action').value = action;
-  document.getElementById('override-form').submit();
+// Expense detail (expand inline)
+function openExpenseDetail(id) {
+  alert("Expense #" + id + " — detailed view: check the approvals in the manager dashboard or implement a detail modal as needed.");
 }
 </script>
 {% endblock %}

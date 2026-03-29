@@ -3,62 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}ReimburseFlow{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <title>{% block title %}Reimbursement Manager{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-  {% block head %}{% endblock %}
 </head>
 <body>
-
-{% if current_user.is_authenticated %}
-<nav class="navbar">
-  <a class="navbar__brand" href="/">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2"/>
-      <path d="M2 10h20"/>
-    </svg>
-    ReimburseFlow
-  </a>
-
-  <div class="navbar__spacer"></div>
-
-  <div class="navbar__user">
-    <strong>{{ current_user.name }}</strong>
-    <span class="badge badge--{{ current_user.role.value }}">{{ current_user.role.value }}</span>
-    {% if current_user.company %}
-      <span class="text-muted text-sm">{{ current_user.company.name }}</span>
-    {% endif %}
-    <div class="navbar__divider"></div>
-    <a class="navbar__logout" href="{{ url_for('auth.logout') }}">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-        <polyline points="16 17 21 12 16 7"/>
-        <line x1="21" y1="12" x2="9" y2="12"/>
-      </svg>
-      Logout
-    </a>
-  </div>
-</nav>
-{% endif %}
-
-<div class="page-wrapper">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div style="max-width:1100px;margin:16px auto 0;padding:0 24px;">
-        <ul class="flash-list">
-          {% for category, message in messages %}
-            <li class="flash flash--{{ category }}">{{ message }}</li>
-          {% endfor %}
-        </ul>
+  {% if current_user.is_authenticated %}
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <span class="brand-icon">💼</span>
+      <span class="brand-name">ReimburseFlow</span>
+      {% if current_user.company %}
+        <span class="brand-company">{{ current_user.company.name }}</span>
+      {% endif %}
+    </div>
+    <div class="navbar-links">
+      {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.blueprint == 'admin' %}active{% endif %}">Admin</a>
+      {% elif current_user.role == 'manager' %}
+        <a href="{{ url_for('manager.dashboard') }}" class="nav-link {% if request.blueprint == 'manager' %}active{% endif %}">Approvals</a>
+      {% else %}
+        <a href="{{ url_for('employee.dashboard') }}" class="nav-link {% if request.blueprint == 'employee' %}active{% endif %}">My Expenses</a>
+      {% endif %}
+      <div class="nav-user">
+        <span class="user-badge role-{{ current_user.role }}">{{ current_user.role|capitalize }}</span>
+        <span class="user-name">{{ current_user.name }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline">Logout</a>
       </div>
-    {% endif %}
-  {% endwith %}
+    </div>
+  </nav>
+  {% endif %}
 
-  {% block content %}{% endblock %}
-</div>
+  <main class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-container">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+              <span>{{ message }}</span>
+              <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
 
-{% block scripts %}{% endblock %}
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

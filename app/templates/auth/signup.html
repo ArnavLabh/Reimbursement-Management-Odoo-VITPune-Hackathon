@@ -1,214 +1,102 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create Account — ReimburseFlow</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Company Setup — ReimburseFlow{% endblock %}
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div style="max-width:560px;margin:16px auto 0;padding:0 16px;">
-      <ul class="flash-list">
-        {% for category, message in messages %}
-          <li class="flash flash--{{ category }}">{{ message }}</li>
-        {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
-{% endwith %}
-
-<div class="auth-page">
-  <div class="auth-box auth-box--wide">
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card auth-card-wide">
     <div class="auth-header">
-      <a class="brand" href="/">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="5" width="20" height="14" rx="2"/>
-          <path d="M2 10h20"/>
-        </svg>
-        ReimburseFlow
-      </a>
-      <h1>Set up your company</h1>
-      <p>You'll be the Admin. Add employees and managers after sign-up.</p>
+      <div class="auth-logo">🏢</div>
+      <h1>Set Up Your Company</h1>
+      <p>Create the admin account and your company profile</p>
     </div>
 
-    <div class="auth-body">
-      <form method="POST" action="{{ url_for('auth.signup') }}" id="signup-form">
+    <form method="POST" action="{{ url_for('auth.signup') }}" class="auth-form">
+      <div class="form-section-label">Admin Account</div>
 
-        <!-- Company Section -->
-        <div class="auth-section-label">Company</div>
-
+      <div class="form-row">
         <div class="form-group">
-          <label for="company_name">Company name</label>
-          <input
-            type="text"
-            id="company_name"
-            name="company_name"
-            value="{{ form_data.get('company_name', '') }}"
-            placeholder="Acme Corp"
-            required
-          />
+          <label for="name">Full Name</label>
+          <input type="text" id="name" name="name" placeholder="Jane Smith" required />
         </div>
-
-        <div class="form-row">
-          <div class="form-group mb-0">
-            <label for="country">Country</label>
-            <select id="country" name="country" required>
-              <option value="">Loading countries...</option>
-            </select>
-          </div>
-          <div class="form-group mb-0">
-            <label for="currency_code">Currency</label>
-            <input
-              type="text"
-              id="currency_code"
-              name="currency_code"
-              placeholder="Auto-filled"
-              readonly
-              value="{{ form_data.get('currency_code', '') }}"
-              style="background:var(--surface);cursor:default;"
-            />
-            <span class="form-hint" id="currency-hint">Selected automatically from country.</span>
-          </div>
-        </div>
-
-        <!-- Admin Account Section -->
-        <div class="auth-section-label">Your Admin Account</div>
-
         <div class="form-group">
-          <label for="admin_name">Your full name</label>
-          <input
-            type="text"
-            id="admin_name"
-            name="admin_name"
-            value="{{ form_data.get('admin_name', '') }}"
-            placeholder="Jane Smith"
-            required
-          />
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="admin@company.com" required />
         </div>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required minlength="6" />
+      </div>
 
+      <div class="form-section-label" style="margin-top:1.5rem;">Company Details</div>
+
+      <div class="form-group">
+        <label for="company_name">Company Name</label>
+        <input type="text" id="company_name" name="company_name" placeholder="Acme Corp" required />
+      </div>
+
+      <div class="form-row">
         <div class="form-group">
-          <label for="email">Work email</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value="{{ form_data.get('email', '') }}"
-            placeholder="jane@acmecorp.com"
-            required
-          />
+          <label for="country_select">Country</label>
+          <select id="country_select" name="country" required>
+            <option value="">Loading countries…</option>
+          </select>
         </div>
-
-        <div class="form-row">
-          <div class="form-group mb-0">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" placeholder="Min. 6 characters" required />
-          </div>
-          <div class="form-group mb-0">
-            <label for="confirm_password">Confirm password</label>
-            <input type="password" id="confirm_password" name="confirm_password" placeholder="Repeat password" required />
-          </div>
+        <div class="form-group">
+          <label for="currency_display">Default Currency</label>
+          <input type="text" id="currency_display" placeholder="Auto-detected" readonly class="input-readonly" />
+          <input type="hidden" id="currency_code" name="currency_code" />
+          <input type="hidden" id="currency_symbol" name="currency_symbol" />
         </div>
+      </div>
 
-        <button type="submit" class="btn btn--primary btn--lg w-full mt-24" id="signup-btn">
-          Create company &amp; sign in
-        </button>
-      </form>
-
-      <p class="auth-footer">
-        Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a>
-      </p>
-    </div>
+      <button type="submit" class="btn btn-primary btn-full" style="margin-top:1.5rem;">Create Company &amp; Admin</button>
+    </form>
   </div>
 </div>
 
 <script>
-(function () {
-  const COUNTRIES_API = 'https://restcountries.com/v3.1/all?fields=name,currencies';
-  const countrySelect = document.getElementById('country');
-  const currencyInput = document.getElementById('currency_code');
-  const currencyHint  = document.getElementById('currency-hint');
+(async () => {
+  const countrySelect = document.getElementById("country_select");
+  const currencyDisplay = document.getElementById("currency_display");
+  const currencyCodeInput = document.getElementById("currency_code");
+  const currencySymbolInput = document.getElementById("currency_symbol");
 
-  // Map: country name -> { code, name }
-  let countryData = {};
+  const SYMBOL_MAP = {
+    USD:"$",EUR:"€",GBP:"£",INR:"₹",JPY:"¥",CNY:"¥",AUD:"A$",CAD:"C$",
+    CHF:"Fr",KRW:"₩",BRL:"R$",MXN:"$",SGD:"S$",HKD:"HK$",NOK:"kr",
+    SEK:"kr",DKK:"kr",NZD:"NZ$",ZAR:"R",RUB:"₽",TRY:"₺",AED:"د.إ",
+    SAR:"﷼",THB:"฿",IDR:"Rp",MYR:"RM",PHP:"₱",VND:"₫",PKR:"₨",BDT:"৳",
+  };
 
-  fetch(COUNTRIES_API)
-    .then(r => r.json())
-    .then(data => {
-      // Build sorted list
-      const list = data
-        .map(c => {
-          const currencies = c.currencies || {};
-          const codes = Object.keys(currencies);
-          const firstCode = codes[0] || '';
-          const firstName = firstCode ? currencies[firstCode].name : '';
-          return {
-            name: c.name.common,
-            code: firstCode,
-            currencyName: firstName,
-          };
-        })
-        .filter(c => c.code)
-        .sort((a, b) => a.name.localeCompare(b.name));
+  try {
+    const resp = await fetch("https://restcountries.com/v3.1/all?fields=name,currencies");
+    const countries = await resp.json();
+    countries.sort((a, b) => a.name.common.localeCompare(b.name.common));
 
-      countrySelect.innerHTML = '<option value="">Select a country</option>';
-      list.forEach(c => {
-        countryData[c.name] = { code: c.code, currencyName: c.currencyName };
-        const opt = document.createElement('option');
-        opt.value = c.name;
-        opt.textContent = `${c.name} (${c.code})`;
-        // Restore selection if form resubmitted with errors
-        const prev = '{{ form_data.get("country", "") }}';
-        if (prev && c.name === prev) opt.selected = true;
-        countrySelect.appendChild(opt);
-      });
-
-      // If pre-selected (from error resubmit), fill currency
-      const prev = '{{ form_data.get("country", "") }}';
-      if (prev && countryData[prev]) {
-        setCurrency(countryData[prev]);
-      }
-    })
-    .catch(() => {
-      countrySelect.innerHTML = '<option value="">Failed to load — type country manually</option>';
-      countrySelect.removeAttribute('disabled');
+    countrySelect.innerHTML = '<option value="">Select a country</option>';
+    countries.forEach(c => {
+      const currKeys = Object.keys(c.currencies || {});
+      if (!currKeys.length) return;
+      const opt = document.createElement("option");
+      opt.value = c.name.common;
+      opt.dataset.currency = currKeys[0];
+      opt.textContent = c.name.common;
+      countrySelect.appendChild(opt);
     });
 
-  function setCurrency(info) {
-    currencyInput.value = info.code;
-    currencyHint.textContent = `${info.currencyName} (${info.code})`;
+    countrySelect.addEventListener("change", () => {
+      const selected = countrySelect.options[countrySelect.selectedIndex];
+      const code = selected.dataset.currency || "USD";
+      const symbol = SYMBOL_MAP[code] || code;
+      currencyDisplay.value = `${code} (${symbol})`;
+      currencyCodeInput.value = code;
+      currencySymbolInput.value = symbol;
+    });
+  } catch (err) {
+    countrySelect.innerHTML = '<option value="">Could not load countries</option>';
+    console.error("Country fetch failed:", err);
   }
-
-  countrySelect.addEventListener('change', () => {
-    const selected = countrySelect.value;
-    if (selected && countryData[selected]) {
-      setCurrency(countryData[selected]);
-    } else {
-      currencyInput.value = '';
-      currencyHint.textContent = 'Selected automatically from country.';
-    }
-  });
-
-  // Validate password match before submit
-  document.getElementById('signup-form').addEventListener('submit', function(e) {
-    const pw  = document.getElementById('password').value;
-    const cpw = document.getElementById('confirm_password').value;
-    if (pw !== cpw) {
-      e.preventDefault();
-      alert('Passwords do not match. Please try again.');
-    }
-    if (!currencyInput.value) {
-      e.preventDefault();
-      alert('Please select a country to set the currency.');
-    }
-  });
 })();
 </script>
-
-</body>
-</html>
+{% endblock %}

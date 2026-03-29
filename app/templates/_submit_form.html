@@ -1,0 +1,193 @@
+<form method="POST" action="{{ url_for('employee.submit_expense') }}" enctype="multipart/form-data" class="submit-form" id="expense-form">
+
+  <!-- Receipt Upload + OCR -->
+  <div class="receipt-upload-zone" id="upload-zone">
+    <input type="file" name="receipt" id="receipt-input" accept="image/*,.pdf" style="display:none;" onchange="handleReceiptChange(this)" />
+    <div id="upload-prompt" onclick="document.getElementById('receipt-input').click()" style="cursor:pointer;">
+      <div class="upload-icon">📎</div>
+      <p><strong>Upload Receipt</strong> (optional)</p>
+      <p class="text-muted text-sm">OCR will auto-fill fields from the image</p>
+    </div>
+    <div id="upload-preview" style="display:none;">
+      <img id="preview-img" src="" alt="Receipt preview" style="max-height:120px;border-radius:8px;" />
+      <div>
+        <p id="preview-filename" class="text-sm"></p>
+        <button type="button" class="btn btn-sm btn-outline" id="ocr-btn" onclick="runOCR()">🔍 Extract with OCR</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="clearReceipt()">✕ Remove</button>
+      </div>
+      <div id="ocr-status" class="text-sm text-muted" style="margin-top:.25rem;"></div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Title <span class="required">*</span></label>
+      <input type="text" name="title" id="field-title" placeholder="Lunch with client" required />
+    </div>
+    <div class="form-group">
+      <label>Vendor / Merchant</label>
+      <input type="text" name="vendor" id="field-vendor" placeholder="Starbucks" />
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Category <span class="required">*</span></label>
+      <select name="category" id="field-category" required>
+        <option value="">Select category</option>
+        {% for cat in categories %}
+          <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Date <span class="required">*</span></label>
+      <input type="date" name="expense_date" id="field-date" required value="{{ now().strftime('%Y-%m-%d') if now is defined else '' }}" />
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Amount <span class="required">*</span></label>
+      <input type="number" name="amount" id="field-amount" placeholder="0.00" step="0.01" min="0.01" required oninput="updateConversion()" />
+    </div>
+    <div class="form-group">
+      <label>Currency</label>
+      <select name="currency" id="field-currency" onchange="updateConversion()">
+        <option value="{{ company.currency_code }}" selected>{{ company.currency_code }} (company default)</option>
+        <option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option>
+        <option value="INR">INR</option><option value="JPY">JPY</option><option value="AUD">AUD</option>
+        <option value="CAD">CAD</option><option value="SGD">SGD</option><option value="AED">AED</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="conversion-display" class="conversion-banner" style="display:none;">
+    <span id="conversion-text">Calculating…</span>
+  </div>
+
+  <div class="form-group">
+    <label>Description</label>
+    <textarea name="description" id="field-description" rows="2" placeholder="Additional details…"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>Approval Rule</label>
+    <select name="rule_id">
+      <option value="">— No rule (pending admin action) —</option>
+      {% for rule in rules %}
+        <option value="{{ rule.id }}">{{ rule.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div style="text-align:right;margin-top:1rem;">
+    <button type="submit" class="btn btn-primary">Submit Expense</button>
+  </div>
+</form>
+
+<script>
+const companyCurrency = "{{ company.currency_code }}";
+
+function handleReceiptChange(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  document.getElementById("upload-prompt").style.display = "none";
+  document.getElementById("upload-preview").style.display = "flex";
+  document.getElementById("preview-filename").textContent = file.name;
+  if (file.type.startsWith("image/")) {
+    const reader = new FileReader();
+    reader.onload = e => { document.getElementById("preview-img").src = e.target.result; };
+    reader.readAsDataURL(file);
+    document.getElementById("preview-img").style.display = "block";
+  } else {
+    document.getElementById("preview-img").style.display = "none";
+  }
+}
+
+function clearReceipt() {
+  document.getElementById("receipt-input").value = "";
+  document.getElementById("upload-prompt").style.display = "block";
+  document.getElementById("upload-preview").style.display = "none";
+  document.getElementById("preview-img").src = "";
+}
+
+async function runOCR() {
+  const input = document.getElementById("receipt-input");
+  if (!input.files || !input.files[0]) return;
+  const statusEl = document.getElementById("ocr-status");
+  const btn = document.getElementById("ocr-btn");
+  btn.disabled = true;
+  btn.textContent = "Extracting…";
+  statusEl.textContent = "Running OCR…";
+
+  const formData = new FormData();
+  formData.append("receipt", input.files[0]);
+
+  try {
+    const resp = await fetch("{{ url_for('employee.ocr_receipt') }}", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await resp.json();
+    if (data.error && !data.amount) {
+      statusEl.textContent = "OCR error: " + data.error;
+    } else {
+      if (data.amount) document.getElementById("field-amount").value = data.amount;
+      if (data.date) document.getElementById("field-date").value = data.date;
+      if (data.vendor) document.getElementById("field-vendor").value = data.vendor;
+      if (data.description) document.getElementById("field-description").value = data.description;
+      if (data.category) {
+        const sel = document.getElementById("field-category");
+        for (let opt of sel.options) {
+          if (opt.value === data.category) { sel.value = data.category; break; }
+        }
+      }
+      statusEl.textContent = "Fields auto-filled from receipt.";
+      updateConversion();
+    }
+  } catch (e) {
+    statusEl.textContent = "OCR failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔍 Extract with OCR";
+  }
+}
+
+let conversionTimer = null;
+function updateConversion() {
+  const currency = document.getElementById("field-currency").value;
+  const amount = parseFloat(document.getElementById("field-amount").value);
+  const banner = document.getElementById("conversion-display");
+  const text = document.getElementById("conversion-text");
+
+  if (currency === companyCurrency || !amount) {
+    banner.style.display = "none";
+    return;
+  }
+  banner.style.display = "block";
+  text.textContent = "Converting…";
+
+  clearTimeout(conversionTimer);
+  conversionTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch(`/employee/convert-currency?from=${currency}&to=${companyCurrency}`);
+      const data = await resp.json();
+      if (data.rate) {
+        const converted = (amount * data.rate).toFixed(2);
+        text.textContent = `≈ ${companyCurrency} ${converted} (rate: 1 ${currency} = ${data.rate.toFixed(4)} ${companyCurrency})`;
+      }
+    } catch (e) {
+      text.textContent = "Could not fetch exchange rate.";
+    }
+  }, 600);
+}
+
+// Set today's date default
+document.addEventListener("DOMContentLoaded", () => {
+  const dateField = document.getElementById("field-date");
+  if (!dateField.value) {
+    dateField.value = new Date().toISOString().split("T")[0];
+  }
+});
+</script>

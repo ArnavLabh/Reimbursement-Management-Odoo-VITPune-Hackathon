@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}403 Forbidden — ReimburseFlow{% endblock %}
+{% block title %}403 Forbidden{% endblock %}
 {% block content %}
-<div class="page-container" style="text-align:center;padding-top:80px;">
-  <h1 style="font-size:4rem;color:var(--border);margin-bottom:8px;">403</h1>
+<div class="error-page">
+  <div class="error-code">403</div>
   <h2>Access Denied</h2>
   <p>You don't have permission to view this page.</p>
-  <a href="/" class="btn btn--primary mt-24">Go home</a>
+  <a href="/" class="btn btn-primary">Go Home</a>
 </div>
 {% endblock %}

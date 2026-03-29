@@ -1,46 +1,42 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_required, current_user
-from .... import db
-from ..models import User, Company, Expense, ApprovalRule, ApprovalStep, RoleEnum
-from ..utils import role_required
+from werkzeug.security import generate_password_hash
+from datetime import datetime
+from app import db
+from app.models import User, Company, ApprovalRule, ApprovalStep, Expense, ExpenseApproval
+from app.utils import role_required, EXPENSE_CATEGORIES
 
 admin_bp = Blueprint("admin", __name__)
 
 
-@admin_bp.route("/")
+@admin_bp.route("/dashboard")
 @login_required
 @role_required("admin")
 def dashboard():
     company = current_user.company
-    employees = User.query.filter_by(
-        company_id=company.id, role=RoleEnum.employee
-    ).all()
-    managers = User.query.filter_by(
-        company_id=company.id, role=RoleEnum.manager
-    ).all()
-    all_users = User.query.filter(
-        User.company_id == company.id,
-        User.id != current_user.id
-    ).all()
-    approval_rules = ApprovalRule.query.filter_by(company_id=company.id).all()
-    all_expenses = (
-        Expense.query
-        .join(User, Expense.employee_id == User.id)
-        .filter(User.company_id == company.id)
-        .order_by(Expense.created_at.desc())
-        .limit(20)
-        .all()
-    )
+    users = User.query.filter_by(company_id=company.id).all()
+    rules = ApprovalRule.query.filter_by(company_id=company.id).all()
+    expenses = (Expense.query
+                .join(User, Expense.employee_id == User.id)
+                .filter(User.company_id == company.id)
+                .order_by(Expense.created_at.desc())
+                .all())
+    managers_and_admins = [u for u in users if u.role in ("manager", "admin")]
+    employees_only = [u for u in users if u.role == "employee"]
     return render_template(
         "admin/dashboard.html",
+        users=users,
+        rules=rules,
+        expenses=expenses,
+        managers=managers_and_admins,
+        all_approvers=managers_and_admins,
+        employees=employees_only,
+        categories=EXPENSE_CATEGORIES,
         company=company,
-        employees=employees,
-        managers=managers,
-        all_users=all_users,
-        approval_rules=approval_rules,
-        all_expenses=all_expenses,
     )
 
+
+# ── User Management ──────────────────────────────────────────────
 
 @admin_bp.route("/users/create", methods=["POST"])
 @login_required
@@ -52,80 +48,53 @@ def create_user():
     role = request.form.get("role", "employee")
     manager_id = request.form.get("manager_id") or None
 
-    errors = []
-    if not name:
-        errors.append("Name is required.")
-    if not email:
-        errors.append("Email is required.")
-    if len(password) < 6:
-        errors.append("Password must be at least 6 characters.")
-    if role not in ("employee", "manager"):
-        errors.append("Invalid role.")
-    if User.query.filter_by(email=email).first():
-        errors.append(f"Email {email} is already registered.")
+    if not all([name, email, password, role]):
+        flash("All fields are required.", "danger")
+        return redirect(url_for("admin.dashboard"))
 
-    if errors:
-        for e in errors:
-            flash(e, "error")
+    if User.query.filter_by(email=email).first():
+        flash("Email already in use.", "danger")
+        return redirect(url_for("admin.dashboard"))
+
+    if role not in ("employee", "manager", "admin"):
+        flash("Invalid role.", "danger")
         return redirect(url_for("admin.dashboard"))
 
     user = User(
         name=name,
         email=email,
-        role=RoleEnum(role),
+        password_hash=generate_password_hash(password),
+        role=role,
         company_id=current_user.company_id,
         manager_id=int(manager_id) if manager_id else None,
     )
-    user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    flash(f"User '{name}' created successfully as {role}.", "success")
+    flash(f"User '{name}' created as {role}.", "success")
     return redirect(url_for("admin.dashboard"))
 
 
-@admin_bp.route("/users/<int:user_id>/update", methods=["POST"])
+@admin_bp.route("/users/<int:user_id>/edit", methods=["POST"])
 @login_required
 @role_required("admin")
-def update_user(user_id):
+def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     if user.company_id != current_user.company_id:
-        flash("Unauthorized.", "error")
+        flash("Unauthorized.", "danger")
         return redirect(url_for("admin.dashboard"))
 
-    role = request.form.get("role")
+    user.name = request.form.get("name", user.name).strip()
+    user.role = request.form.get("role", user.role)
     manager_id = request.form.get("manager_id") or None
+    user.manager_id = int(manager_id) if manager_id else None
 
-    if role in ("employee", "manager"):
-        user.role = RoleEnum(role)
-    if manager_id:
-        user.manager_id = int(manager_id)
-    else:
-        user.manager_id = None
+    new_password = request.form.get("password", "").strip()
+    if new_password:
+        user.password_hash = generate_password_hash(new_password)
 
     db.session.commit()
     flash(f"User '{user.name}' updated.", "success")
     return redirect(url_for("admin.dashboard"))
-
-
-@admin_bp.route("/settings", methods=["GET", "POST"])
-@login_required
-@role_required("admin")
-def settings():
-    company = current_user.company
-    if request.method == "POST":
-        name = request.form.get("company_name", "").strip()
-        currency_code = request.form.get("currency_code", "").strip().upper()
-        country = request.form.get("country", "").strip()
-        if name:
-            company.name = name
-        if currency_code:
-            company.currency_code = currency_code
-        if country:
-            company.country = country
-        db.session.commit()
-        flash("Company settings updated.", "success")
-        return redirect(url_for("admin.settings"))
-    return render_template("admin/settings.html", company=company)
 
 
 @admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
@@ -133,50 +102,50 @@ def settings():
 @role_required("admin")
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
-    if user.company_id != current_user.company_id:
-        flash("Unauthorized.", "error")
-        return redirect(url_for("admin.dashboard"))
     if user.id == current_user.id:
-        flash("You cannot delete your own admin account.", "error")
+        flash("Cannot delete yourself.", "danger")
+        return redirect(url_for("admin.dashboard"))
+    if user.company_id != current_user.company_id:
+        flash("Unauthorized.", "danger")
         return redirect(url_for("admin.dashboard"))
     db.session.delete(user)
     db.session.commit()
-    flash(f"User '{user.name}' deleted.", "success")
+    flash("User deleted.", "success")
     return redirect(url_for("admin.dashboard"))
 
 
+# ── Approval Rules ────────────────────────────────────────────────
 
+@admin_bp.route("/rules/create", methods=["POST"])
 @login_required
 @role_required("admin")
 def create_rule():
     name = request.form.get("rule_name", "").strip()
-    description = request.form.get("rule_description", "").strip()
-    is_manager_approver = bool(request.form.get("is_manager_approver"))
-    approval_percentage = request.form.get("approval_percentage") or None
+    manager_is_first = request.form.get("manager_is_first_approver") == "on"
+    approval_percentage = float(request.form.get("approval_percentage") or 0)
     specific_approver_id = request.form.get("specific_approver_id") or None
     approver_ids = request.form.getlist("approver_ids[]")
 
     if not name:
-        flash("Rule name is required.", "error")
+        flash("Rule name is required.", "danger")
         return redirect(url_for("admin.dashboard"))
 
     rule = ApprovalRule(
-        company_id=current_user.company_id,
         name=name,
-        description=description,
-        is_manager_approver=is_manager_approver,
-        approval_percentage=float(approval_percentage) if approval_percentage else None,
+        company_id=current_user.company_id,
+        manager_is_first_approver=manager_is_first,
+        approval_percentage=approval_percentage,
         specific_approver_id=int(specific_approver_id) if specific_approver_id else None,
     )
     db.session.add(rule)
     db.session.flush()
 
-    for idx, approver_id in enumerate(approver_ids):
+    for order, approver_id in enumerate(approver_ids, start=1):
         if approver_id:
             step = ApprovalStep(
                 rule_id=rule.id,
                 approver_id=int(approver_id),
-                sequence_order=idx + 1,
+                step_order=order,
             )
             db.session.add(step)
 
@@ -191,42 +160,40 @@ def create_rule():
 def delete_rule(rule_id):
     rule = ApprovalRule.query.get_or_404(rule_id)
     if rule.company_id != current_user.company_id:
-        flash("Unauthorized.", "error")
+        flash("Unauthorized.", "danger")
         return redirect(url_for("admin.dashboard"))
     db.session.delete(rule)
     db.session.commit()
-    flash("Approval rule deleted.", "success")
+    flash("Rule deleted.", "success")
     return redirect(url_for("admin.dashboard"))
 
+
+# ── Expense Override ──────────────────────────────────────────────
 
 @admin_bp.route("/expenses/<int:expense_id>/override", methods=["POST"])
 @login_required
 @role_required("admin")
 def override_expense(expense_id):
-    from ..models import Expense, ExpenseStatusEnum, ApprovalRequest, ApprovalRequestStatusEnum
-    from datetime import datetime
-
     expense = Expense.query.get_or_404(expense_id)
     action = request.form.get("action")
-    comment = request.form.get("comment", "Admin override")
+    comment = request.form.get("comment", "Admin override").strip()
 
     if action == "approve":
-        expense.status = ExpenseStatusEnum.approved
+        expense.status = "approved"
     elif action == "reject":
-        expense.status = ExpenseStatusEnum.rejected
+        expense.status = "rejected"
     else:
-        flash("Invalid action.", "error")
+        flash("Invalid action.", "danger")
         return redirect(url_for("admin.dashboard"))
 
-    # Mark all pending approval requests as acted upon
-    pending = expense.approval_requests.filter_by(
-        status=ApprovalRequestStatusEnum.pending
-    ).all()
-    for ar in pending:
-        ar.status = ApprovalRequestStatusEnum(action + "d")
-        ar.comment = comment
-        ar.acted_at = datetime.utcnow()
+    # Mark all pending approvals as skipped
+    for appr in expense.approvals:
+        if appr.status == "pending":
+            appr.status = "skipped"
+            appr.comment = comment
+            appr.acted_at = datetime.utcnow()
 
+    expense.updated_at = datetime.utcnow()
     db.session.commit()
-    flash(f"Expense #{expense_id} has been {action}d via admin override.", "success")
+    flash(f"Expense #{expense_id} {action}d by admin override.", "success")
     return redirect(url_for("admin.dashboard"))

@@ -2,248 +2,178 @@
 {% block title %}Approvals — ReimburseFlow{% endblock %}
 
 {% block content %}
-<div class="page-container">
-
-  <div class="page-header">
-    <h1>Approvals Queue</h1>
-    <p>Review and act on expense requests assigned to you.</p>
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Approvals Dashboard</h2>
+    <p class="page-subtitle">{{ current_user.name }} &middot; {{ company.name }}</p>
   </div>
-
-  <!-- Stats -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-card__label">Pending Action</div>
-      <div class="stat-card__value">{{ pending_requests|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Approved by You</div>
-      <div class="stat-card__value">{{ acted_requests|selectattr('status.value', 'equalto', 'approved')|list|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Rejected by You</div>
-      <div class="stat-card__value">{{ acted_requests|selectattr('status.value', 'equalto', 'rejected')|list|length }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card__label">Team Members</div>
-      <div class="stat-card__value">{{ team_expenses|map(attribute='employee_id')|list|unique|list|length }}</div>
-    </div>
+  <div class="header-stats">
+    <div class="stat-pill stat-pending">{{ actionable|length }} Pending</div>
+    <div class="stat-pill">{{ history|length }} Reviewed</div>
   </div>
+</div>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="pending">
-      Pending
-      {% if pending_requests %}
-        <span class="badge badge--manager" style="margin-left:6px;">{{ pending_requests|length }}</span>
-      {% endif %}
-    </button>
-    <button class="tab-btn" data-tab="history">My History</button>
-    <button class="tab-btn" data-tab="team">Team Expenses</button>
-  </div>
+<div class="tabs">
+  <button class="tab-btn active" data-tab="pending">⏳ Pending ({{ actionable|length }})</button>
+  <button class="tab-btn" data-tab="history">✅ History</button>
+  <button class="tab-btn" data-tab="team">👥 Team Expenses</button>
+</div>
 
-  <!-- ─── PENDING TAB ─────────────────────────────────────────── -->
-  <div class="tab-pane active" id="tab-pending">
-    {% if pending_requests %}
-      <div style="display:flex;flex-direction:column;gap:16px;">
-        {% for ar in pending_requests %}
-        {% set exp = ar.expense %}
-        {% set emp = exp.employee %}
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3>{{ emp.name }} &mdash; {{ exp.category }}</h3>
-              <small class="text-muted">
-                Submitted {{ exp.created_at.strftime('%d %b %Y') }}
-                &middot; Step {{ ar.step_order }}
-                {% if exp.approval_rule %}&middot; Rule: {{ exp.approval_rule.name }}{% endif %}
-              </small>
-            </div>
-            <span class="chip chip--pending">Awaiting your action</span>
+<!-- ══ PENDING ════════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-pending">
+  {% if actionable %}
+    <div class="approval-cards">
+      {% for ea in actionable %}
+      {% set expense = ea.expense %}
+      <div class="approval-card">
+        <div class="approval-card-header">
+          <div>
+            <h4>{{ expense.title }}</h4>
+            <p class="text-muted text-sm">
+              by <strong>{{ expense.employee.name }}</strong>
+              &middot; {{ expense.category }}
+              &middot; {{ expense.expense_date.strftime('%d %b %Y') }}
+            </p>
           </div>
-          <div class="card-body">
-            <div class="form-row" style="margin-bottom:12px;">
-              <div>
-                <label style="margin-bottom:2px;">Amount (original)</label>
-                <p style="font-size:1.25rem;font-weight:700;color:var(--text-primary);margin:0;">
-                  {{ exp.amount }} {{ exp.currency }}
-                </p>
+          <div class="approval-amount">
+            <div class="amount-primary">{{ expense.currency }} {{ '%.2f'|format(expense.amount) }}</div>
+            {% if expense.currency != company.currency_code %}
+              <div class="amount-converted text-muted text-sm">
+                ≈ {{ company.currency_symbol }}{{ '%.2f'|format(expense.amount_in_company_currency or expense.amount) }} {{ company.currency_code }}
               </div>
-              <div>
-                <label style="margin-bottom:2px;">Amount in {{ company.currency_code }}</label>
-                <p style="font-size:1.25rem;font-weight:700;color:var(--accent);margin:0;">
-                  {% if exp.amount_in_company_currency %}
-                    {{ '%.2f'|format(exp.amount_in_company_currency) }} {{ company.currency_code }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </p>
-              </div>
-              <div>
-                <label style="margin-bottom:2px;">Date</label>
-                <p style="margin:0;color:var(--text-secondary);">{{ exp.date.strftime('%d %B %Y') }}</p>
-              </div>
-            </div>
-
-            {% if exp.description %}
-            <div style="background:var(--surface);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;">
-              <small class="text-muted" style="display:block;margin-bottom:4px;">Description</small>
-              <p style="margin:0;font-size:0.875rem;">{{ exp.description }}</p>
-            </div>
             {% endif %}
-
-            {% if exp.receipt_path %}
-            <div style="margin-bottom:16px;">
-              <a href="{{ url_for('static', filename=exp.receipt_path) }}" target="_blank"
-                class="btn btn--secondary btn--sm">
-                View Receipt
-              </a>
-            </div>
-            {% endif %}
-
-            <!-- Approve / Reject Forms -->
-            <div style="display:flex;gap:12px;flex-wrap:wrap;">
-              <!-- Approve -->
-              <form method="POST" action="{{ url_for('manager.approve', request_id=ar.id) }}"
-                style="flex:1;min-width:220px;"
-                onsubmit="return confirmAction(this, 'approve')">
-                <div class="form-group" style="margin-bottom:8px;">
-                  <textarea name="comment" placeholder="Approval comment (optional)..." style="min-height:60px;"></textarea>
-                </div>
-                <button class="btn btn--success w-full">
-                  Approve
-                </button>
-              </form>
-
-              <!-- Reject -->
-              <form method="POST" action="{{ url_for('manager.reject', request_id=ar.id) }}"
-                style="flex:1;min-width:220px;"
-                onsubmit="return confirmAction(this, 'reject')">
-                <div class="form-group" style="margin-bottom:8px;">
-                  <textarea name="comment" placeholder="Rejection reason (optional)..."></textarea>
-                </div>
-                <button class="btn btn--danger w-full">
-                  Reject
-                </button>
-              </form>
-            </div>
-
           </div>
         </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="card">
-        <div class="empty-state">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <p>All caught up! No expenses waiting for your review.</p>
-        </div>
-      </div>
-    {% endif %}
-  </div>
 
-  <!-- ─── HISTORY TAB ─────────────────────────────────────────── -->
-  <div class="tab-pane" id="tab-history">
-    <div class="card">
-      <div class="card-header"><h3>My Approval History</h3></div>
-      <div class="table-wrap">
-        {% if acted_requests %}
-        <table>
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Category</th>
-              <th>Amount</th>
-              <th>Your Decision</th>
-              <th>Comment</th>
-              <th>Acted On</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for ar in acted_requests %}
-            {% set exp = ar.expense %}
-            <tr>
-              <td><strong>{{ exp.employee.name }}</strong></td>
-              <td>{{ exp.category }}</td>
-              <td>
-                {{ exp.amount }} {{ exp.currency }}
-                {% if exp.amount_in_company_currency %}
-                  <br><small class="text-muted">{{ '%.2f'|format(exp.amount_in_company_currency) }} {{ company.currency_code }}</small>
-                {% endif %}
-              </td>
-              <td><span class="chip chip--{{ ar.status.value }}">{{ ar.status.value }}</span></td>
-              <td class="td-muted">{{ ar.comment or '—' }}</td>
-              <td class="td-muted">{{ ar.acted_at.strftime('%d %b %Y') if ar.acted_at else '—' }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-          <p>No actions taken yet.</p>
-        </div>
+        {% if expense.description %}
+          <p class="approval-description">{{ expense.description }}</p>
         {% endif %}
-      </div>
-    </div>
-  </div>
 
-  <!-- ─── TEAM TAB ──────────────────────────────────────────────── -->
-  <div class="tab-pane" id="tab-team">
-    <div class="card">
-      <div class="card-header"><h3>Team Expenses</h3></div>
-      <div class="table-wrap">
-        {% if team_expenses %}
-        <table>
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Amount</th>
-              <th>In {{ company.currency_code }}</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for exp in team_expenses %}
-            <tr>
-              <td><strong>{{ exp.employee.name }}</strong></td>
-              <td class="td-muted">{{ exp.date.strftime('%d %b %Y') }}</td>
-              <td>{{ exp.category }}</td>
-              <td>{{ exp.amount }} {{ exp.currency }}</td>
-              <td class="td-muted">
-                {{ '%.2f'|format(exp.amount_in_company_currency) if exp.amount_in_company_currency else '—' }}
-              </td>
-              <td><span class="chip chip--{{ exp.status.value }}">{{ exp.status.value }}</span></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-          <p>No direct reports have submitted expenses yet.</p>
-        </div>
+        {% if expense.vendor %}
+          <p class="text-sm text-muted">Vendor: {{ expense.vendor }}</p>
         {% endif %}
-      </div>
-    </div>
-  </div>
 
-</div><!-- /page-container -->
+        {% if expense.receipt_filename %}
+          <a href="{{ url_for('static', filename='uploads/' + expense.receipt_filename) }}" target="_blank" class="btn btn-sm btn-outline" style="margin-bottom:.75rem;">📎 View Receipt</a>
+        {% endif %}
+
+        <!-- Approval chain progress -->
+        <div class="chain-progress">
+          {% for appr in expense.approvals %}
+            <div class="chain-step chain-{{ appr.status }} {% if appr.step_order == expense.current_step %}chain-current{% endif %}">
+              <span class="chain-step-num">{{ appr.step_order }}</span>
+              <span class="chain-step-name">{{ appr.approver.name }}</span>
+              <span class="chain-step-status">{{ appr.status }}</span>
+              {% if appr.comment %}<span class="chain-step-comment">"{{ appr.comment }}"</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="approval-rule-info">
+          {% if expense.approval_rule %}
+            Rule: <strong>{{ expense.approval_rule.name }}</strong>
+            &middot; Step {{ expense.current_step }} of {{ expense.approvals|length }}
+          {% endif %}
+        </div>
+
+        <!-- Action form -->
+        <form method="POST" action="{{ url_for('manager.act_on_expense', expense_id=expense.id) }}" class="action-form">
+          <div class="form-group">
+            <input type="text" name="comment" placeholder="Comment (optional)" class="comment-input" />
+          </div>
+          <div class="action-buttons">
+            <button type="submit" name="action" value="approve" class="btn btn-success">✓ Approve</button>
+            <button type="submit" name="action" value="reject" class="btn btn-danger" onclick="return confirm('Reject this expense?')">✕ Reject</button>
+          </div>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🎉</div>
+      <p>No expenses awaiting your approval right now.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ══ HISTORY ════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-history">
+  {% if history %}
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Expense</th><th>Employee</th><th>Category</th>
+            <th>Amount</th><th>Your Action</th><th>Comment</th><th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ea in history %}
+          {% set expense = ea.expense %}
+          <tr>
+            <td><strong>{{ expense.title }}</strong><br><span class="text-muted text-sm">#{{ expense.id }}</span></td>
+            <td>{{ expense.employee.name }}</td>
+            <td>{{ expense.category }}</td>
+            <td>{{ expense.currency }} {{ '%.2f'|format(expense.amount) }}</td>
+            <td><span class="badge status-{{ ea.status }}">{{ ea.status|capitalize }}</span></td>
+            <td class="text-muted">{{ ea.comment or '—' }}</td>
+            <td class="text-muted">{{ ea.acted_at.strftime('%d %b %Y') if ea.acted_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <p>No approval history yet.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ══ TEAM ════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-team">
+  {% if team_expenses %}
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Employee</th><th>Title</th><th>Category</th>
+            <th>Amount</th><th>Status</th><th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for expense in team_expenses %}
+          <tr>
+            <td class="text-muted">#{{ expense.id }}</td>
+            <td>{{ expense.employee.name }}</td>
+            <td>{{ expense.title }}</td>
+            <td>{{ expense.category }}</td>
+            <td>{{ expense.currency }} {{ '%.2f'|format(expense.amount) }}</td>
+            <td><span class="badge status-{{ expense.status }}">{{ expense.status|capitalize }}</span></td>
+            <td class="text-muted">{{ expense.expense_date.strftime('%d %b %Y') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">👥</div>
+      <p>No team members or no expenses from your team yet.</p>
+    </div>
+  {% endif %}
+</div>
 
 <script>
-// ─── Tabs ─────────────────────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
   });
 });
-
-function confirmAction(form, action) {
-  return confirm(`Are you sure you want to ${action} this expense?`);
-}
 </script>
 {% endblock %}
