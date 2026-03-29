@@ -74,7 +74,8 @@ def submit_expense():
             rates = resp.json().get("rates", {})
             rate = rates.get(company.currency_code, 1)
             amount_in_company_currency = round(amount * rate, 2)
-        except Exception:
+        except Exception as e:
+            current_app.logger.warning(f"Currency conversion failed ({currency}->{company.currency_code}): {e}")
             amount_in_company_currency = amount
 
     # Handle receipt upload

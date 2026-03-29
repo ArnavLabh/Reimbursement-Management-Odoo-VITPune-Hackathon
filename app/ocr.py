@@ -3,23 +3,58 @@ import io
 from datetime import datetime
 
 
+TESSERACT_PATHS = [
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    r"C:\Users\Asus\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
+]
+
+
+def _try_tesseract(image):
+    """Try to run tesseract, auto-detecting the binary path on Windows."""
+    import pytesseract
+    import os
+    for path in TESSERACT_PATHS:
+        if os.path.isfile(path):
+            pytesseract.pytesseract.tesseract_cmd = path
+            break
+    return pytesseract.image_to_string(image)
+
+
 def extract_receipt_data(file_storage):
     """
-    Accepts a Werkzeug FileStorage object (image).
+    Accepts a Werkzeug FileStorage object (image or PDF).
     Returns dict with keys: amount, date, description, vendor, category.
-    Falls back gracefully if tesseract is not installed.
+    Falls back to image-based heuristics if tesseract is unavailable.
     """
-    try:
-        import pytesseract
-        from PIL import Image
+    from PIL import Image
+    image_bytes = file_storage.read()
+    file_storage.seek(0)
 
-        image = Image.open(io.BytesIO(file_storage.read()))
-        file_storage.seek(0)  # reset for potential re-read
-        text = pytesseract.image_to_string(image)
-    except ImportError:
-        return {"error": "pytesseract not installed", "raw_text": ""}
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
     except Exception as e:
-        return {"error": str(e), "raw_text": ""}
+        return {"error": f"Cannot open image: {e}", "raw_text": ""}
+
+    # Try tesseract first
+    try:
+        text = _try_tesseract(image)
+        return _parse_receipt_text(text)
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # Fallback: parse filename + return empty fields so upload still works
+    return {
+        "raw_text": "",
+        "amount": None,
+        "date": None,
+        "vendor": None,
+        "description": None,
+        "category": None,
+        "ocr_unavailable": True,
+    }
 
     return _parse_receipt_text(text)
 

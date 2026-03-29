@@ -2,85 +2,156 @@
 {% block title %}Company Settings — ReimburseFlow{% endblock %}
 
 {% block content %}
-<div class="page-container" style="max-width:640px;">
+<div class="settings-page">
 
-  <div class="page-header flex-center gap-12">
-    <a href="{{ url_for('admin.dashboard') }}" class="btn btn--ghost btn--sm">&larr; Dashboard</a>
-    <h1>Company Settings</h1>
+  <div class="settings-header">
+    <div>
+      <h2 class="page-title">Company Settings</h2>
+      <p class="page-subtitle">Manage your organisation profile and defaults</p>
+    </div>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">← Dashboard</a>
   </div>
 
-  <div class="card">
-    <div class="card-header"><h3>{{ company.name }}</h3></div>
-    <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.settings') }}">
+  <div class="settings-grid">
+
+    <!-- Company Profile Card -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <span class="settings-card-icon">🏢</span>
+        <div>
+          <h3>Company Profile</h3>
+          <p>Update your company name, country and default currency</p>
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('admin.settings') }}" class="settings-form">
 
         <div class="form-group">
-          <label>Company name</label>
+          <label>Company Name</label>
           <input type="text" name="company_name" value="{{ company.name }}" required />
         </div>
 
         <div class="form-row">
-          <div class="form-group mb-0">
+          <div class="form-group">
             <label>Country</label>
             <select id="country-select" name="country">
               <option value="{{ company.country }}" selected>{{ company.country }}</option>
             </select>
           </div>
-          <div class="form-group mb-0">
-            <label>Default currency</label>
-            <input type="text" id="currency-input" name="currency_code"
-              value="{{ company.currency_code }}"
-              style="background:var(--surface);" />
-            <span class="form-hint" id="currency-hint">Auto-filled from country selection.</span>
+          <div class="form-group">
+            <label>Default Currency</label>
+            <select id="currency-select" name="currency_code">
+              {% set currencies = [
+                ('AED','AED — UAE Dirham'),('AUD','AUD — Australian Dollar'),
+                ('BDT','BDT — Bangladeshi Taka'),('BRL','BRL — Brazilian Real'),
+                ('CAD','CAD — Canadian Dollar'),('CHF','CHF — Swiss Franc'),
+                ('CNY','CNY — Chinese Yuan'),('DKK','DKK — Danish Krone'),
+                ('EUR','EUR — Euro'),('GBP','GBP — British Pound'),
+                ('HKD','HKD — Hong Kong Dollar'),('IDR','IDR — Indonesian Rupiah'),
+                ('INR','INR — Indian Rupee'),('JPY','JPY — Japanese Yen'),
+                ('KRW','KRW — South Korean Won'),('MXN','MXN — Mexican Peso'),
+                ('MYR','MYR — Malaysian Ringgit'),('NOK','NOK — Norwegian Krone'),
+                ('NZD','NZD — New Zealand Dollar'),('PHP','PHP — Philippine Peso'),
+                ('PKR','PKR — Pakistani Rupee'),('RUB','RUB — Russian Ruble'),
+                ('SAR','SAR — Saudi Riyal'),('SEK','SEK — Swedish Krona'),
+                ('SGD','SGD — Singapore Dollar'),('THB','THB — Thai Baht'),
+                ('TRY','TRY — Turkish Lira'),('USD','USD — US Dollar'),
+                ('VND','VND — Vietnamese Dong'),('ZAR','ZAR — South African Rand')
+              ] %}
+              {% for code, label in currencies %}
+                <option value="{{ code }}" {% if code == company.currency_code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <span class="form-hint" id="currency-hint">Auto-filled when you change country</span>
           </div>
         </div>
 
-        <div class="mt-24">
-          <button type="submit" class="btn btn--primary">Save changes</button>
+        <div class="settings-form-footer">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
       </form>
     </div>
-  </div>
 
+    <!-- Info Card -->
+    <div class="settings-card settings-info-card">
+      <div class="settings-card-header">
+        <span class="settings-card-icon">ℹ️</span>
+        <div>
+          <h3>Current Configuration</h3>
+          <p>Your active company settings</p>
+        </div>
+      </div>
+      <div class="settings-info-list">
+        <div class="settings-info-row">
+          <span class="settings-info-label">Company</span>
+          <span class="settings-info-value">{{ company.name }}</span>
+        </div>
+        <div class="settings-info-row">
+          <span class="settings-info-label">Country</span>
+          <span class="settings-info-value">{{ company.country }}</span>
+        </div>
+        <div class="settings-info-row">
+          <span class="settings-info-label">Currency</span>
+          <span class="settings-info-value">
+            <span class="currency-badge">{{ company.currency_symbol }} {{ company.currency_code }}</span>
+          </span>
+        </div>
+        <div class="settings-info-row">
+          <span class="settings-info-label">Created</span>
+          <span class="settings-info-value">{{ company.created_at.strftime('%d %b %Y') }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <script>
 (function () {
-  const COUNTRIES_API = 'https://restcountries.com/v3.1/all?fields=name,currencies';
+  const CURRENCY_MAP = {
+    'United States':'USD','India':'INR','United Kingdom':'GBP','Germany':'EUR',
+    'France':'EUR','Japan':'JPY','China':'CNY','Australia':'AUD','Canada':'CAD',
+    'Switzerland':'CHF','South Korea':'KRW','Brazil':'BRL','Mexico':'MXN',
+    'Singapore':'SGD','Hong Kong':'HKD','Norway':'NOK','Sweden':'SEK',
+    'Denmark':'DKK','New Zealand':'NZD','South Africa':'ZAR','Russia':'RUB',
+    'Turkey':'TRY','United Arab Emirates':'AED','Saudi Arabia':'SAR',
+    'Thailand':'THB','Indonesia':'IDR','Malaysia':'MYR','Philippines':'PHP',
+    'Vietnam':'VND','Pakistan':'PKR','Bangladesh':'BDT',
+  };
+
   const countrySelect  = document.getElementById('country-select');
-  const currencyInput  = document.getElementById('currency-input');
+  const currencySelect = document.getElementById('currency-select');
   const currencyHint   = document.getElementById('currency-hint');
   const currentCountry = '{{ company.country }}';
-  let countryData = {};
 
-  fetch(COUNTRIES_API)
+  fetch('https://restcountries.com/v3.1/all?fields=name,currencies')
     .then(r => r.json())
     .then(data => {
       const list = data
-        .map(c => {
-          const codes = Object.keys(c.currencies || {});
-          const code = codes[0] || '';
-          return { name: c.name.common, code, currencyName: code ? c.currencies[code].name : '' };
-        })
+        .map(c => ({ name: c.name.common, code: Object.keys(c.currencies || {})[0] || '' }))
         .filter(c => c.code)
         .sort((a, b) => a.name.localeCompare(b.name));
 
       countrySelect.innerHTML = '<option value="">Select country</option>';
       list.forEach(c => {
-        countryData[c.name] = c;
         const opt = document.createElement('option');
         opt.value = c.name;
-        opt.textContent = `${c.name} (${c.code})`;
+        opt.textContent = c.name;
+        opt.dataset.currency = c.code;
         if (c.name === currentCountry) opt.selected = true;
         countrySelect.appendChild(opt);
       });
+    })
+    .catch(() => {
+      // fallback: keep existing option
     });
 
   countrySelect.addEventListener('change', () => {
-    const sel = countrySelect.value;
-    if (sel && countryData[sel]) {
-      currencyInput.value = countryData[sel].code;
-      currencyHint.textContent = countryData[sel].currencyName + ' (' + countryData[sel].code + ')';
+    const opt = countrySelect.options[countrySelect.selectedIndex];
+    const code = opt.dataset.currency || CURRENCY_MAP[opt.value] || '';
+    if (code) {
+      currencySelect.value = code;
+      currencyHint.textContent = `Auto-filled: ${code}`;
     }
   });
 })();

@@ -7,7 +7,7 @@
     <h2 class="page-title">My Expenses</h2>
     <p class="page-subtitle">{{ current_user.name }} &middot; {{ company.name }}</p>
   </div>
-  <button class="btn btn-primary" onclick="openModal('modal-submit')">+ Submit Expense</button>
+  <button class="btn btn-primary" onclick="switchToSubmitTab()">+ Submit Expense</button>
 </div>
 
 <!-- Tabs -->
@@ -96,7 +96,7 @@
       <button class="modal-close" onclick="closeModal('modal-submit')">×</button>
     </div>
     <div class="modal-body" style="padding-top:0;">
-      {% include "employee/_submit_form.html" %}
+      <p class="text-muted" style="text-align:center;padding:1rem 0;">Use the <strong>New Expense</strong> tab to submit an expense.</p>
     </div>
   </div>
 </div>
@@ -107,6 +107,12 @@ function closeModal(id) { document.getElementById(id).classList.remove("open"); 
 document.querySelectorAll(".modal-overlay").forEach(o => {
   o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); });
 });
+function switchToSubmitTab() {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.querySelector(".tab-btn[data-tab='submit-inline']").classList.add("active");
+  document.getElementById("tab-submit-inline").classList.add("active");
+}
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));

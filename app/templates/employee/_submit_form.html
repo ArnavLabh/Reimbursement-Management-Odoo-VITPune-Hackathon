@@ -130,7 +130,9 @@ async function runOCR() {
       body: formData,
     });
     const data = await resp.json();
-    if (data.error && !data.amount) {
+    if (data.ocr_unavailable) {
+      statusEl.textContent = "OCR unavailable (Tesseract not installed) — receipt uploaded, fill fields manually.";
+    } else if (data.error && !data.amount) {
       statusEl.textContent = "OCR error: " + data.error;
     } else {
       if (data.amount) document.getElementById("field-amount").value = data.amount;
