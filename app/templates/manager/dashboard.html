@@ -117,8 +117,8 @@
             <td>{{ expense.category }}</td>
             <td>{{ expense.currency }} {{ '%.2f'|format(expense.amount) }}</td>
             <td><span class="badge status-{{ ea.status }}">{{ ea.status|capitalize }}</span></td>
-            <td class="text-muted">{{ ea.comment or '—' }}</td>
-            <td class="text-muted">{{ ea.acted_at.strftime('%d %b %Y') if ea.acted_at else '—' }}</td>
+            <td class="text-muted">{{ ea.comment or '-' }}</td>
+            <td class="text-muted">{{ ea.acted_at.strftime('%d %b %Y') if ea.acted_at else '-' }}</td>
           </tr>
           {% endfor %}
         </tbody>

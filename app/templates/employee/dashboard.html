@@ -43,7 +43,7 @@
             {% endif %}
           </td>
           <td class="text-muted">{{ expense.expense_date.strftime('%d %b %Y') }}</td>
-          <td class="text-muted">{{ expense.approval_rule.name if expense.approval_rule else '—' }}</td>
+          <td class="text-muted">{{ expense.approval_rule.name if expense.approval_rule else '-' }}</td>
           <td>
             <span class="badge status-{{ expense.status }}">{{ expense.status|capitalize }}</span>
           </td>
@@ -51,13 +51,13 @@
             {% if expense.approvals %}
               <div class="approval-chain-mini">
                 {% for appr in expense.approvals %}
-                  <span class="appr-dot appr-{{ appr.status }}" title="{{ appr.approver.name }}: {{ appr.status }}{% if appr.comment %} — {{ appr.comment }}{% endif %}">
+                  <span class="appr-dot appr-{{ appr.status }}" title="{{ appr.approver.name }}: {{ appr.status }}{% if appr.comment %} - {{ appr.comment }}{% endif %}">
                     {{ appr.step_order }}
                   </span>
                 {% endfor %}
               </div>
             {% else %}
-              <span class="text-muted">—</span>
+              <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td class="actions-cell">

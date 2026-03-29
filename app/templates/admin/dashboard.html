@@ -41,7 +41,7 @@
           <td><strong>{{ user.name }}</strong>{% if user.id == current_user.id %} <span class="badge badge-you">You</span>{% endif %}</td>
           <td class="text-muted">{{ user.email }}</td>
           <td><span class="badge role-{{ user.role }}">{{ user.role|capitalize }}</span></td>
-          <td>{{ user.manager.name if user.manager else '—' }}</td>
+          <td>{{ user.manager.name if user.manager else '-' }}</td>
           <td class="text-muted">{{ user.created_at.strftime('%d %b %Y') }}</td>
           <td class="actions-cell">
             <button class="btn btn-sm btn-outline" onclick="openEditUser({{ user.id }}, '{{ user.name }}', '{{ user.role }}', {{ user.manager_id or 'null' }})">Edit</button>
@@ -200,7 +200,7 @@
         <div class="form-group">
           <label>Manager (optional)</label>
           <select name="manager_id">
-            <option value="">— None —</option>
+            <option value="">- None -</option>
             {% for m in managers %}
               <option value="{{ m.id }}">{{ m.name }} ({{ m.role }})</option>
             {% endfor %}
@@ -241,7 +241,7 @@
         <div class="form-group">
           <label>Manager (optional)</label>
           <select name="manager_id" id="edit-user-manager">
-            <option value="">— None —</option>
+            <option value="">- None -</option>
             {% for m in managers %}
               <option value="{{ m.id }}">{{ m.name }}</option>
             {% endfor %}
@@ -284,7 +284,7 @@
           <div class="approver-step-row">
             <span class="step-num">1</span>
             <select name="approver_ids[]" class="approver-select">
-              <option value="">— Select approver —</option>
+              <option value="">- Select approver -</option>
               {% for u in all_approvers %}
                 <option value="{{ u.id }}">{{ u.name }} ({{ u.role }})</option>
               {% endfor %}
@@ -303,7 +303,7 @@
           <div class="form-group">
             <label>Specific Auto-Approver (optional)</label>
             <select name="specific_approver_id">
-              <option value="">— None —</option>
+              <option value="">- None -</option>
               {% for u in all_approvers %}
                 <option value="{{ u.id }}">{{ u.name }}</option>
               {% endfor %}
@@ -374,7 +374,7 @@ function openEditUser(id, name, role, managerId) {
 function openOverride(expenseId, action) {
   document.getElementById("override-form").action = `/admin/expenses/${expenseId}/override`;
   document.getElementById("override-action").value = action;
-  document.getElementById("override-title").textContent = `Admin ${action.charAt(0).toUpperCase() + action.slice(1)} — Expense #${expenseId}`;
+  document.getElementById("override-title").textContent = `Admin ${action.charAt(0).toUpperCase() + action.slice(1)} - Expense #${expenseId}`;
   openModal("modal-override");
 }
 
@@ -388,7 +388,7 @@ function addApproverStep() {
   row.innerHTML = `
     <span class="step-num">${stepCount}</span>
     <select name="approver_ids[]" class="approver-select">
-      <option value="">— Select approver —</option>
+      <option value="">- Select approver -</option>
       {% for u in all_approvers %}
         <option value="{{ u.id }}">{{ u.name }} ({{ u.role }})</option>
       {% endfor %}
