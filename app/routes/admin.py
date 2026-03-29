@@ -130,6 +130,12 @@ def create_rule():
         flash("Rule name is required.", "danger")
         return redirect(url_for("admin.dashboard"))
 
+    # Ensure at least one approval mechanism is configured
+    has_steps = any(aid for aid in approver_ids if aid)
+    if not manager_is_first and not has_steps and not specific_approver_id and not approval_percentage:
+        flash("At least one approver or rule condition must be configured.", "danger")
+        return redirect(url_for("admin.dashboard"))
+
     rule = ApprovalRule(
         name=name,
         company_id=current_user.company_id,
@@ -197,3 +203,26 @@ def override_expense(expense_id):
     db.session.commit()
     flash(f"Expense #{expense_id} {action}d by admin override.", "success")
     return redirect(url_for("admin.dashboard"))
+
+
+# ── Company Settings ──────────────────────────────────────────────
+
+@admin_bp.route("/settings", methods=["GET", "POST"])
+@login_required
+@role_required("admin")
+def settings():
+    company = current_user.company
+
+    if request.method == "POST":
+        company.name = request.form.get("company_name", company.name).strip()
+        company.country = request.form.get("country", company.country).strip()
+        currency_code = request.form.get("currency_code", company.currency_code).strip().upper()
+        company.currency_code = currency_code
+        from app.utils import get_currency_symbol
+        company.currency_symbol = get_currency_symbol(currency_code)
+
+        db.session.commit()
+        flash("Company settings updated successfully.", "success")
+        return redirect(url_for("admin.dashboard"))
+
+    return render_template("settings.html", company=company)

@@ -47,10 +47,10 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="currency_display">Default Currency</label>
-          <input type="text" id="currency_display" placeholder="Auto-detected" readonly class="input-readonly" />
-          <input type="hidden" id="currency_code" name="currency_code" />
-          <input type="hidden" id="currency_symbol" name="currency_symbol" />
+          <label for="currency_code">Default Currency</label>
+          <input type="text" id="currency_code" name="currency_code" placeholder="USD" required />
+          <input type="hidden" id="currency_symbol" name="currency_symbol" value="$" />
+          <small class="form-hint" id="currency_hint">Auto-filled from country selection — you can edit it</small>
         </div>
       </div>
 
@@ -62,9 +62,9 @@
 <script>
 (async () => {
   const countrySelect = document.getElementById("country_select");
-  const currencyDisplay = document.getElementById("currency_display");
   const currencyCodeInput = document.getElementById("currency_code");
   const currencySymbolInput = document.getElementById("currency_symbol");
+  const currencyHint = document.getElementById("currency_hint");
 
   const SYMBOL_MAP = {
     USD:"$",EUR:"€",GBP:"£",INR:"₹",JPY:"¥",CNY:"¥",AUD:"A$",CAD:"C$",
@@ -93,9 +93,15 @@
       const selected = countrySelect.options[countrySelect.selectedIndex];
       const code = selected.dataset.currency || "USD";
       const symbol = SYMBOL_MAP[code] || code;
-      currencyDisplay.value = `${code} (${symbol})`;
       currencyCodeInput.value = code;
       currencySymbolInput.value = symbol;
+      currencyHint.textContent = `Auto-filled: ${code} (${symbol}). You can change it if needed.`;
+    });
+    
+    // Update symbol when user manually changes currency code
+    currencyCodeInput.addEventListener("input", () => {
+      const code = currencyCodeInput.value.toUpperCase();
+      currencySymbolInput.value = SYMBOL_MAP[code] || code;
     });
   } catch (err) {
     countrySelect.innerHTML = '<option value="">Could not load countries</option>';

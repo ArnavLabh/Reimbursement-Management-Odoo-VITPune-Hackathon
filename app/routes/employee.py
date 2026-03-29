@@ -141,6 +141,9 @@ def _build_approval_chain(expense):
             db.session.add(appr)
             added_approver_ids.add(employee.manager_id)
             step_order += 1
+        elif not (employee and employee.manager_id):
+            from flask import flash as _flash
+            _flash("Warning: rule requires manager approval but you have no assigned manager. Step skipped.", "warning")
 
     # Add rule-defined steps, skipping duplicates
     for step in rule.steps:
