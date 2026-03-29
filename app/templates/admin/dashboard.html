@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Admin Dashboard — ReimburseFlow{% endblock %}
+{% block title %}Admin Dashboard - ReimburseFlow{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h2 class="page-title">Admin Dashboard</h2>
-    <p class="page-subtitle">{{ company.name }} &middot; {{ company.currency_code }} ({{ company.currency_symbol }})</p>
+    <p class="page-subtitle">{{ company.name }} · {{ company.currency_code }} ({{ company.currency_symbol }})</p>
   </div>
   <div class="header-stats">
     <div class="stat-pill">{{ users|length }} Users</div>

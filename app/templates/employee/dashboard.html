@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}My Expenses — ReimburseFlow{% endblock %}
+{% block title %}My Expenses - ReimburseFlow{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h2 class="page-title">My Expenses</h2>
-    <p class="page-subtitle">{{ current_user.name }} &middot; {{ company.name }}</p>
+    <p class="page-subtitle">{{ current_user.name }} · {{ company.name }}</p>
   </div>
   <button class="btn btn-primary" onclick="switchToSubmitTab()">+ Submit Expense</button>
 </div>

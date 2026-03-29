@@ -131,9 +131,11 @@ async function runOCR() {
     });
     const data = await resp.json();
     if (data.ocr_unavailable) {
-      statusEl.textContent = "OCR unavailable (Tesseract not installed) — receipt uploaded, fill fields manually.";
+      statusEl.textContent = "OCR unavailable - Please fill fields manually.";
+      statusEl.style.color = "var(--warning)";
     } else if (data.error && !data.amount) {
       statusEl.textContent = "OCR error: " + data.error;
+      statusEl.style.color = "var(--danger)";
     } else {
       if (data.amount) document.getElementById("field-amount").value = data.amount;
       if (data.date) document.getElementById("field-date").value = data.date;
