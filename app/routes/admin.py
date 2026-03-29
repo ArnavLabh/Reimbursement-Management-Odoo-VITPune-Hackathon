@@ -205,6 +205,33 @@ def override_expense(expense_id):
     return redirect(url_for("admin.dashboard"))
 
 
+@admin_bp.route("/expenses/<int:expense_id>/detail")
+@login_required
+@role_required("admin")
+def expense_detail(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
+    return jsonify({
+        "id": expense.id,
+        "title": expense.title,
+        "employee_name": expense.employee.name,
+        "status": expense.status,
+        "amount": expense.amount,
+        "currency": expense.currency,
+        "expense_date": expense.expense_date.strftime('%Y-%m-%d'),
+        "category": expense.category,
+        "description": expense.description,
+        "vendor": expense.vendor,
+        "current_step": expense.current_step,
+        "approvals": [{
+            "step_order": a.step_order,
+            "approver_name": a.approver.name,
+            "status": a.status,
+            "comment": a.comment,
+            "acted_at": a.acted_at.strftime('%Y-%m-%d %H:%M') if a.acted_at else None,
+        } for a in expense.approvals]
+    })
+
+
 # ── Company Settings ──────────────────────────────────────────────
 
 @admin_bp.route("/settings", methods=["GET", "POST"])

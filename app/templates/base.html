@@ -30,8 +30,8 @@
         <a href="{{ url_for('employee.dashboard') }}" class="nav-link {% if request.blueprint == 'employee' %}active{% endif %}">My Expenses</a>
       {% endif %}
       <div class="nav-user">
-        <span class="user-badge role-{{ current_user.role }}">{{ current_user.role|capitalize }}</span>
         <span class="user-name">{{ current_user.name }}</span>
+        <span class="user-role">{{ current_user.role|capitalize }}</span>
         <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline">Logout</a>
       </div>
     </div>

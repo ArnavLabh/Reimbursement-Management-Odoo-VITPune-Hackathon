@@ -6,7 +6,8 @@ from datetime import datetime
 TESSERACT_PATHS = [
     r"C:\Program Files\Tesseract-OCR\tesseract.exe",
     r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-    r"C:\Users\Asus\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
+    "/usr/bin/tesseract",  # Linux
+    "/usr/local/bin/tesseract",  # macOS
 ]
 
 
@@ -41,22 +42,27 @@ def extract_receipt_data(file_storage):
         text = _try_tesseract(image)
         return _parse_receipt_text(text)
     except ImportError:
-        pass
-    except Exception:
-        pass
-
-    # Fallback: parse filename + return empty fields so upload still works
-    return {
-        "raw_text": "",
-        "amount": None,
-        "date": None,
-        "vendor": None,
-        "description": None,
-        "category": None,
-        "ocr_unavailable": True,
-    }
-
-    return _parse_receipt_text(text)
+        # Tesseract not installed - return unavailable flag
+        return {
+            "raw_text": "",
+            "amount": None,
+            "date": None,
+            "vendor": None,
+            "description": None,
+            "category": None,
+            "ocr_unavailable": True,
+        }
+    except Exception as e:
+        # Tesseract error - return error message
+        return {
+            "raw_text": "",
+            "amount": None,
+            "date": None,
+            "vendor": None,
+            "description": None,
+            "category": None,
+            "error": f"OCR processing failed: {str(e)}",
+        }
 
 
 def _parse_receipt_text(text):

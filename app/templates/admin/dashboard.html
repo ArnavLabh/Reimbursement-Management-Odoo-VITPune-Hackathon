@@ -420,9 +420,91 @@ function filterExpenses() {
   });
 }
 
-// Expense detail (expand inline)
+// Expense detail modal
 function openExpenseDetail(id) {
-  alert("Expense #" + id + " — detailed view: check the approvals in the manager dashboard or implement a detail modal as needed.");
+  // Fetch expense details and show in a modal
+  fetch(`/admin/expenses/${id}/detail`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error loading expense details');
+        return;
+      }
+      // Create and show detail modal
+      showExpenseDetailModal(data);
+    })
+    .catch(e => {
+      alert('Failed to load expense details');
+    });
+}
+
+function showExpenseDetailModal(expense) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>Expense #${expense.id} - ${expense.title}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Employee</label>
+            <input type="text" value="${expense.employee_name}" readonly class="input-readonly" />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <input type="text" value="${expense.status}" readonly class="input-readonly" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount</label>
+            <input type="text" value="${expense.currency} ${expense.amount}" readonly class="input-readonly" />
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="text" value="${expense.expense_date}" readonly class="input-readonly" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <input type="text" value="${expense.category}" readonly class="input-readonly" />
+        </div>
+        ${expense.description ? `
+        <div class="form-group">
+          <label>Description</label>
+          <textarea readonly class="input-readonly">${expense.description}</textarea>
+        </div>
+        ` : ''}
+        ${expense.vendor ? `
+        <div class="form-group">
+          <label>Vendor</label>
+          <input type="text" value="${expense.vendor}" readonly class="input-readonly" />
+        </div>
+        ` : ''}
+        <div class="form-section-label" style="margin-top:1rem;">Approval Chain</div>
+        <div class="chain-progress">
+          ${expense.approvals.map(a => `
+            <div class="chain-step chain-${a.status} ${a.step_order === expense.current_step ? 'chain-current' : ''}">
+              <span class="chain-step-num">${a.step_order}</span>
+              <span class="chain-step-name">${a.approver_name}</span>
+              <span class="chain-step-status">${a.status}</span>
+              ${a.comment ? `<span class="chain-step-comment" title="${a.comment}">${a.comment}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => {
+    if (e.target === modal) modal.remove();
+  });
 }
 </script>
 {% endblock %}

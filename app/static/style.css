@@ -88,8 +88,18 @@ body {
   transition: color var(--transition);
 }
 .nav-link:hover, .nav-link.active { color: var(--text); }
-.nav-user { display: flex; align-items: center; gap: .75rem; }
-.user-name { font-size: .875rem; color: var(--text-muted); }
+.nav-user { display: flex; align-items: center; gap: 1rem; }
+.user-name { font-size: .9rem; font-weight: 600; color: var(--text); }
+.user-role {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: .3rem .7rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
 
 /* MAIN CONTENT */
 .main-content { max-width: 1280px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
