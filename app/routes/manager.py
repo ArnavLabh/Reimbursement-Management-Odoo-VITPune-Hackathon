@@ -37,16 +37,27 @@ def dashboard():
         .all()
     )
 
-    # Team expenses (subordinates)
-    subordinate_ids = [u.id for u in current_user.subordinates]
-    team_expenses = []
-    if subordinate_ids:
+    # Team expenses - show all company expenses for managers/admins
+    if current_user.role == 'admin':
+        # Admin sees all company expenses
         team_expenses = (
             Expense.query
-            .filter(Expense.employee_id.in_(subordinate_ids))
+            .join(User, Expense.employee_id == User.id)
+            .filter(User.company_id == current_user.company_id)
             .order_by(Expense.created_at.desc())
             .all()
         )
+    else:
+        # Manager sees subordinates' expenses
+        subordinate_ids = [u.id for u in current_user.subordinates]
+        team_expenses = []
+        if subordinate_ids:
+            team_expenses = (
+                Expense.query
+                .filter(Expense.employee_id.in_(subordinate_ids))
+                .order_by(Expense.created_at.desc())
+                .all()
+            )
 
     return render_template(
         "manager/dashboard.html",

@@ -22,13 +22,6 @@
       {% endif %}
     </div>
     <div class="navbar-links">
-      {% if current_user.role == 'admin' %}
-        <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.blueprint == 'admin' %}active{% endif %}">Admin</a>
-      {% elif current_user.role == 'manager' %}
-        <a href="{{ url_for('manager.dashboard') }}" class="nav-link {% if request.blueprint == 'manager' %}active{% endif %}">Approvals</a>
-      {% else %}
-        <a href="{{ url_for('employee.dashboard') }}" class="nav-link {% if request.blueprint == 'employee' %}active{% endif %}">My Expenses</a>
-      {% endif %}
       <div class="nav-user">
         <span class="user-name">{{ current_user.name }}</span>
         <span class="user-role">{{ current_user.role|capitalize }}</span>

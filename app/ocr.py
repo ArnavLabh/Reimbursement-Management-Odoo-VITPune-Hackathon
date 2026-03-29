@@ -15,10 +15,22 @@ def _try_tesseract(image):
     """Try to run tesseract, auto-detecting the binary path on Windows."""
     import pytesseract
     import os
+    
+    # Try to find tesseract executable
+    tesseract_found = False
     for path in TESSERACT_PATHS:
         if os.path.isfile(path):
             pytesseract.pytesseract.tesseract_cmd = path
+            tesseract_found = True
             break
+    
+    if not tesseract_found:
+        # Try system PATH
+        try:
+            pytesseract.get_tesseract_version()
+        except:
+            raise FileNotFoundError("Tesseract executable not found")
+    
     return pytesseract.image_to_string(image)
 
 
@@ -35,33 +47,53 @@ def extract_receipt_data(file_storage):
     try:
         image = Image.open(io.BytesIO(image_bytes))
     except Exception as e:
-        return {"error": f"Cannot open image: {e}", "raw_text": ""}
+        return {"error": f"Cannot open image: {e}"}
 
     # Try tesseract first
     try:
         text = _try_tesseract(image)
-        return _parse_receipt_text(text)
-    except ImportError:
-        # Tesseract not installed - return unavailable flag
+        if text and text.strip():
+            return _parse_receipt_text(text)
+        else:
+            return {
+                "error": "No text detected in image",
+                "amount": None,
+                "date": None,
+                "vendor": None,
+                "description": None,
+                "category": None,
+            }
+    except ImportError as e:
+        # pytesseract not installed
         return {
-            "raw_text": "",
+            "ocr_unavailable": True,
+            "error": "Tesseract OCR is not installed. Please install it to use this feature.",
             "amount": None,
             "date": None,
             "vendor": None,
             "description": None,
             "category": None,
+        }
+    except FileNotFoundError as e:
+        # Tesseract executable not found
+        return {
             "ocr_unavailable": True,
+            "error": "Tesseract executable not found. Please install Tesseract OCR.",
+            "amount": None,
+            "date": None,
+            "vendor": None,
+            "description": None,
+            "category": None,
         }
     except Exception as e:
-        # Tesseract error - return error message
+        # Other tesseract errors
         return {
-            "raw_text": "",
+            "error": f"OCR processing failed: {str(e)}",
             "amount": None,
             "date": None,
             "vendor": None,
             "description": None,
             "category": None,
-            "error": f"OCR processing failed: {str(e)}",
         }
 
 

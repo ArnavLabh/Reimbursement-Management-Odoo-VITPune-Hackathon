@@ -130,25 +130,57 @@ async function runOCR() {
       body: formData,
     });
     const data = await resp.json();
+    
+    // Clear previous status styling
+    statusEl.style.color = "";
+    
     if (data.ocr_unavailable) {
-      statusEl.textContent = "OCR unavailable - Please fill fields manually.";
+      statusEl.textContent = data.error || "OCR unavailable - Please fill fields manually.";
       statusEl.style.color = "var(--warning)";
-    } else if (data.error && !data.amount) {
-      statusEl.textContent = "OCR error: " + data.error;
+    } else if (data.error) {
+      statusEl.textContent = data.error;
       statusEl.style.color = "var(--danger)";
+    } else if (!data.amount && !data.date && !data.vendor) {
+      statusEl.textContent = "No data extracted. Please fill fields manually.";
+      statusEl.style.color = "var(--warning)";
     } else {
-      if (data.amount) document.getElementById("field-amount").value = data.amount;
-      if (data.date) document.getElementById("field-date").value = data.date;
-      if (data.vendor) document.getElementById("field-vendor").value = data.vendor;
-      if (data.description) document.getElementById("field-description").value = data.description;
+      // Fill in extracted data
+      let fieldsUpdated = [];
+      if (data.amount) {
+        document.getElementById("field-amount").value = data.amount;
+        fieldsUpdated.push("amount");
+      }
+      if (data.date) {
+        document.getElementById("field-date").value = data.date;
+        fieldsUpdated.push("date");
+      }
+      if (data.vendor) {
+        document.getElementById("field-vendor").value = data.vendor;
+        fieldsUpdated.push("vendor");
+      }
+      if (data.description) {
+        document.getElementById("field-description").value = data.description;
+        fieldsUpdated.push("description");
+      }
       if (data.category) {
         const sel = document.getElementById("field-category");
         for (let opt of sel.options) {
-          if (opt.value === data.category) { sel.value = data.category; break; }
+          if (opt.value === data.category) {
+            sel.value = data.category;
+            fieldsUpdated.push("category");
+            break;
+          }
         }
       }
-      statusEl.textContent = "Fields auto-filled from receipt.";
-      updateConversion();
+      
+      if (fieldsUpdated.length > 0) {
+        statusEl.textContent = `✓ Extracted: ${fieldsUpdated.join(", ")}. Please review and adjust.`;
+        statusEl.style.color = "var(--success)";
+        updateConversion();
+      } else {
+        statusEl.textContent = "No data could be extracted from the image.";
+        statusEl.style.color = "var(--warning)";
+      }
     }
   } catch (e) {
     statusEl.textContent = "OCR failed: " + e.message;
