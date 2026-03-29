@@ -118,52 +118,27 @@ def act_on_expense(expense_id):
 def _advance_or_close(expense):
     """
     Called after an approver acts positively. Checks:
-    1. Specific approver auto-approval
-    2. Percentage threshold auto-approval
-    3. Sequential advance to next step
-    4. All steps done -> approved
+    1. Sequential advance to next step
+    2. All steps done -> approved
+    3. Specific approver auto-approval (only if all approved)
+    4. Percentage threshold auto-approval (only if threshold met)
     """
     rule = ApprovalRule.query.get(expense.rule_id) if expense.rule_id else None
     all_approvals = sorted(expense.approvals, key=lambda a: a.step_order)
     approved_count = sum(1 for a in all_approvals if a.status == "approved")
     total_steps = len(all_approvals)
 
-    # --- Specific approver rule ---
-    if rule and rule.specific_approver_id:
-        just_approved_by_specific = any(
-            a for a in all_approvals
-            if a.approver_id == rule.specific_approver_id and a.status == "approved"
-        )
-        if just_approved_by_specific:
-            _close_expense_approved(expense, all_approvals)
-            return
-
-    # --- Percentage rule ---
-    if rule and rule.approval_percentage and rule.approval_percentage > 0:
-        if total_steps > 0:
-            pct = (approved_count / total_steps) * 100
-            if pct >= rule.approval_percentage:
-                _close_expense_approved(expense, all_approvals)
-                return
-
     # --- Sequential: find next pending step ---
     next_step = expense.current_step + 1
     next_approval = next((a for a in all_approvals if a.step_order == next_step), None)
 
     if next_approval:
+        # Move to next step
         expense.current_step = next_step
         expense.updated_at = datetime.utcnow()
     else:
-        # No more steps - fully approved
+        # No more steps - all approvers have acted, mark as approved
         expense.status = "approved"
         expense.updated_at = datetime.utcnow()
 
 
-def _close_expense_approved(expense, all_approvals):
-    """Mark expense approved and skip remaining pending steps."""
-    expense.status = "approved"
-    expense.updated_at = datetime.utcnow()
-    for a in all_approvals:
-        if a.status == "pending":
-            a.status = "skipped"
-            a.acted_at = datetime.utcnow()
