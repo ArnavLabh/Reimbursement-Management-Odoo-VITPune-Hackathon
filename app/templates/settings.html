@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Company Settings — ReimburseFlow{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:640px;">
+
+  <div class="page-header flex-center gap-12">
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn--ghost btn--sm">&larr; Dashboard</a>
+    <h1>Company Settings</h1>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>{{ company.name }}</h3></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.settings') }}">
+
+        <div class="form-group">
+          <label>Company name</label>
+          <input type="text" name="company_name" value="{{ company.name }}" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group mb-0">
+            <label>Country</label>
+            <select id="country-select" name="country">
+              <option value="{{ company.country }}" selected>{{ company.country }}</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label>Default currency</label>
+            <input type="text" id="currency-input" name="currency_code"
+              value="{{ company.currency_code }}"
+              style="background:var(--surface);" />
+            <span class="form-hint" id="currency-hint">Auto-filled from country selection.</span>
+          </div>
+        </div>
+
+        <div class="mt-24">
+          <button type="submit" class="btn btn--primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const COUNTRIES_API = 'https://restcountries.com/v3.1/all?fields=name,currencies';
+  const countrySelect  = document.getElementById('country-select');
+  const currencyInput  = document.getElementById('currency-input');
+  const currencyHint   = document.getElementById('currency-hint');
+  const currentCountry = '{{ company.country }}';
+  let countryData = {};
+
+  fetch(COUNTRIES_API)
+    .then(r => r.json())
+    .then(data => {
+      const list = data
+        .map(c => {
+          const codes = Object.keys(c.currencies || {});
+          const code = codes[0] || '';
+          return { name: c.name.common, code, currencyName: code ? c.currencies[code].name : '' };
+        })
+        .filter(c => c.code)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      countrySelect.innerHTML = '<option value="">Select country</option>';
+      list.forEach(c => {
+        countryData[c.name] = c;
+        const opt = document.createElement('option');
+        opt.value = c.name;
+        opt.textContent = `${c.name} (${c.code})`;
+        if (c.name === currentCountry) opt.selected = true;
+        countrySelect.appendChild(opt);
+      });
+    });
+
+  countrySelect.addEventListener('change', () => {
+    const sel = countrySelect.value;
+    if (sel && countryData[sel]) {
+      currencyInput.value = countryData[sel].code;
+      currencyHint.textContent = countryData[sel].currencyName + ' (' + countryData[sel].code + ')';
+    }
+  });
+})();
+</script>
+{% endblock %}
